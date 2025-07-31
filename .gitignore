@@ -1,0 +1,16 @@
+# Общие правила
+.DS_Store
+*.local
+*.log
+.vscode/
+
+# Vue (client)
+node_modules/
+dist/
+dist-ssr/
+
+# Go (server)
+/bin/
+/out/
+*.env
+*.test
