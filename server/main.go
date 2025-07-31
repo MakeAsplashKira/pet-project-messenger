@@ -14,7 +14,6 @@ func main() {
 	if err := godotenv.Load("data.env"); err != nil {
 		log.Fatal("Не удалось загрузить data.env: ", err)
 	}
-
 	db := config.InitDB()
 	defer db.Close()
 
@@ -25,7 +24,7 @@ func main() {
 	mux.HandleFunc("/api/check-email", h.CheckEmailAvailability)
 	mux.HandleFunc("/api/check-username", h.CheckUsernameAvailability)
 	mux.HandleFunc("/api/send-verif-code", h.SendVerificationCodeHandler)
-	mux.HandleFunc("/api/check-verif-code", h.VerifyCodeHandler)
+	mux.HandleFunc("/api/check-verif-code", h.VerifyCode)
 	mux.HandleFunc("/api/reg-user", h.RegistrateNewUser)
 
 	handler := enableCORS(mux)

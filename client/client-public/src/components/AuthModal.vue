@@ -121,6 +121,7 @@ import { useNotifications } from '@/stores/notifications';
 import lottie from 'lottie-web';
 import LiquidProgress from './anim/LiquidProgress.vue';
 import useNotify from '@/composable/useNotify';
+import { checkEmailOnServer, checkUsername, registerUser, sendVerificationCodeOnServer, VerifyCodeOnServer } from '@/api.js';
 
 
 
@@ -326,32 +327,26 @@ watch(username, async ()=> {
 }) 
 
 const validateUNonServer = async(username) => {
-  const response = await fetch('http://localhost:8080/api/check-username', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-      },
-    body: JSON.stringify({
-        username: username
-      }),
-  })
-  if (!response.ok) {
-    console.log('There are some problems with server bro')
-  }
-  const data = await response.json()
-  if (data.available) {
-    isUNvalidByServer.value = true
-    if(!isUNAnimChanged.value) {
-      isUNAnimChanged.value = true
-      updateCurrentStepFillPercent(15)
+  try {
+    const {data} = await checkUsername(username)
+
+    if (data?.available) {
+      isUNvalidByServer.value = true
+      if(!isUNAnimChanged.value) {
+        isUNAnimChanged.value = true
+        updateCurrentStepFillPercent(15)
+      }
+    }
+    else {
+      isUNvalidByServer.value = false
+      if(isUNAnimChanged.value) {
+        isUNAnimChanged.value = false
+        updateCurrentStepFillPercent(-15)
+      }
     }
   }
-  else {
-    isUNvalidByServer.value = false
-    if(isUNAnimChanged) {
-      isUNAnimChanged.value = false
-      updateCurrentStepFillPercent(-15)
-    }
+  catch (error) {
+    console.error('Ошибка: ', error.response?.data?.message || error.message)
   }
 }
 
@@ -379,26 +374,14 @@ const sendEmailToVerif = () => {
 const sendVerifCode = async() => {
   if (!timerInterval) {
     try {
-      const response = await fetch('http://localhost:8080/api/send-verif-code', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: email.value
-      }),
-    })
-    if(!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    const data = await response.json()
-    if (data.status == "success") {
-      verifCodeSent.value = true
-      startCountdown()
-    }
+      const {data} = await sendVerificationCodeOnServer(email.value)
+      if (data?.status == "success") {
+        verifCodeSent.value = true
+        startCountdown()
+      }
     }
     catch (error) {
-      console.log(error)
+      console.error('Ошибка: ', error.response?.data?.message || error.message)
     }
     
   } else notify.warning('Вы уже отправляли код аутентификации!')
@@ -409,29 +392,23 @@ const verifyCode = async () => {
   if(code.value.length == 6) {
     verifCodeStatus.value = -1
     try {
-      const response = await fetch('http://localhost:8080/api/check-verif-code', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: email.value,
-        code: code.value
-      }),
-    })
-    if (!response.ok) {
-      throw new Error (data.error)
+      const {data} = await VerifyCodeOnServer(email.value, code.value)
+      if(data?.status == 'success') {
+        emailAuthDone.value=true
+        verifCodeStatus.value = 1
+        updateCurrentStepFillPercent(20)
+      }
     }
-      const data = await response.json()
-      emailAuthDone.value=true
-      verifCodeStatus.value = 1
-      updateCurrentStepFillPercent(20)
+    catch(error) {
+      verifCodeStatus.value = -2
+      notify.error(error.response?.data?.message || error.message)
+      console.error('Ошибка: ', error.response?.data?.message || error.message)
+    }
+    try {
+   
       
     }
     catch (error) {
-      verifCodeStatus.value = -2
-      console.log('Ошибка верификации: ', error)
-      notify.error(error.message)
     }
   } else notify.warning('Неверный синтаксис!')
   
@@ -486,28 +463,15 @@ const validateEmail = async  () => {
   }
 
   try {
-    const response = await fetch('http://localhost:8080/api/check-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: email.value
-      }),
-      
-    })
-    if(!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    const data = await response.json()
-    if (data.available) {
+    const {data} = await checkEmailOnServer(email.value)
+    if (data?.available) {
       emailStatus.value = 1
       if (!emailAnimUpdated.value){
         updateCurrentStepFillPercent(20)
         emailAnimUpdated.value=true
       }
       emailReadyToSend.value = true
-    } else {
+    } else if(!data?.available) {
       notify.error('E-mail уже занят!')
       emailStatus.value = -1
       emailApproved.value = false
@@ -522,36 +486,24 @@ const validateEmail = async  () => {
   }
 }
 
-const sendCode = async () => {
-  await api.sendVerificationCode(email.value);
-  auth.nextStep();
-};
-
-
-
 const completeRegistration = async () => {
   if (!bottomButtonActive.value) return
 
   if (regStep.value == 1) {
-    const response = await fetch('http://localhost:8080/api/reg-user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    try {
+      const {data} = await registerUser({
         username: username.value,
         email: email.value,
         password: password.value
-      }),
-    })
-    if (!response.ok) {
-      throw new Error('По пизде пошло....')
+      })
+      if (data?.status=='success') {
+        //*JWT авторизация СДЕЛАТЬ!!!
+      }
     }
-    if(response.status) {
-      //*Доделать ответ полноценный.
+    catch(error) {
+      console.error('Ошибка: ', error.response?.data?.message || error.message)
     }
   } 
-  
 };
 
 const closeAuthModal = () => {

@@ -4,24 +4,29 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const (
-	host         = "localhost"
-	port         = 5432
-	user         = "postgres"
-	password     = "123"
-	dbname       = "messenger"
-	poolMaxConns = 10
-)
-
 func InitDB() *pgxpool.Pool {
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+	poolMaxConns := 10
+
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatal("Неверный формат порта: ", err)
+	}
+
 	connStr := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		user, password, host, port, dbname,
+		user, password, host, portInt, dbname,
 	)
 
 	config, err := pgxpool.ParseConfig(connStr)
