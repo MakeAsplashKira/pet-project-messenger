@@ -50,26 +50,40 @@ api.interceptors.response.use(
   async error => {
     const originalRequest = error.config;
 
-    if(error.response?.status === 401 && !originalRequest._retry) {
+    // Игнорируем запросы на refresh и logout при 401
+    if (error.response?.status === 401 && 
+        !originalRequest._retry && 
+        !originalRequest.url.includes('/refresh-tokens') && 
+        !originalRequest.url.includes('/logout')) {
+      
       originalRequest._retry = true;
 
-    try {
-      const {data} = await refreshTokensByServer()
-      localStorage.setItem('accessToken', data.accessToken)
-      api.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`
-      return api(originalRequest)
-    }
-    catch (refreshError) {
-      localStorage.removeItem('accessToken')
-      delete api.defaults.headers.common['Authorization']
-      router.push('/')
-      const auth = useAuthStore()
-      auth.openAuthModal()
-      return Promise.reject(refreshError)
+      try {
+        const { data } = await refreshTokensByServer();
+        localStorage.setItem('accessToken', data.accessToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Полная очистка при неудачном обновлении
+        localStorage.removeItem('accessToken');
+        delete api.defaults.headers.common['Authorization'];
+        
+        const auth = useAuthStore();
+        auth.openAuthModal();
+        router.push('/');
+        
+        return Promise.reject(refreshError);
       }
     }
-    return Promise.reject(error)
+    
+    // Для всех остальных 401 (включая /refresh-tokens и /logout)
+    if (error.response?.status === 401) {
+      const auth = useAuthStore()
+      auth.clearAuth()
+    }
+    
+    return Promise.reject(error);
   }
-)
+);
 
 export default api;

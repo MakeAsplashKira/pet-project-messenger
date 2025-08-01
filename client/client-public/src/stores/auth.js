@@ -122,6 +122,7 @@ const register = async (userData) => {
     authStep,
     isAuthenticated,
     refreshTokens,
+    clearAuth,
     checkAuth,
     openAuthModal,
     closeAuthModal,
@@ -137,10 +138,9 @@ const register = async (userData) => {
         paths: ['accessToken', 'user'],
         storage: localStorage,
         beforeHydrate: (context) => {
-            console.log('Before hydrate...', context)
+            //логика
         },
         afterHydrate: (context) => {
-            console.log('After hydrate...', context)
             if (context.store.accessToken) {
                 api.defaults.headers.common['Authorization'] = `Bearer ${context.store.accessToken}`
             }

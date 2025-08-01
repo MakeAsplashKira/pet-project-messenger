@@ -146,38 +146,28 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	// 1. Извлекаем токен (с проверкой формата)
+	refreshCookies, err := r.Cookie("refresh_token")
+	if err == nil {
+		_, _ = h.db.Exec(context.Background(),
+			`DELETE FROM refresh_tokens WHERE token_hash = $1`,
+			hashToken(refreshCookies.Value))
+	}
+
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		http.Error(w, "Invalid authorization header", http.StatusBadRequest)
-		return
+		tokenString := authHeader[7:]
+		revokedTokens.Store(tokenString, true)
 	}
-	tokenString := authHeader[7:]
 
-	// 2. Парсим БЕЗ проверки срока (но с проверкой подписи)
-	parser := jwt.NewParser(
-		jwt.WithoutClaimsValidation(),
-	) // Отключаем проверку exp
-	claims := &AuthClaims{}
-
-	_, err := parser.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
-		return []byte(h.jwtSecret), nil
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		MaxAge:   -1,
 	})
-	if err != nil {
-		http.Error(w, "Invalid token signature", http.StatusUnauthorized)
-		return
-	}
 
-	// 3. Проверяем, не отозван ли токен
-	if _, ok := revokedTokens.Load(tokenString); ok {
-		http.Error(w, "Token already revoked", http.StatusUnauthorized)
-		return
-	}
-
-	// 4. Добавляем в чёрный список (даже если просрочен)
-	revokedTokens.Store(tokenString, true)
-
-	// 5. Отвечаем успехом
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import lottie from 'lottie-web';
+import { logoutUser } from '@/api';
 
 const lottieContainer = ref(null);
 
@@ -23,6 +24,7 @@ onMounted(async () => {
             <div class="site-name">MediaVerse</div>
         </div>
         <div class="header-main">тут что-то будет</div>
+        <div @click="logoutUser" class="vihjod" style="cursor: pointer;">Выход</div>
         <div class="header-profile" @click="$router.push('/profile')"></div>
     </div>
   </div>

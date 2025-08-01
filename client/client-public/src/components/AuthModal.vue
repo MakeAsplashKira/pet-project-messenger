@@ -147,6 +147,20 @@ const registrationSteps = ref([
   {text:'Готово!',fillPercent: 0, cSize: 100, currentStage: false},  
 ])
 
+
+const AuthType = ref('choose')
+const isRotating = ref(false)
+const isLoading = ref(false)
+
+
+
+
+
+
+
+
+
+
 const goToNextStep=()=> {
   if(bottomButtonActive) {
     updateCurrentStepFillPercentToMax()
@@ -536,11 +550,21 @@ onUnmounted(()=> {
 .auth-modal__content {
   position: relative;
   background: #17212b;
-  border-radius: 8px;
   width: 100%;
   height: 500px;
+  transform: rotate3d(1, 0, 0, 0);
   max-width: 400px;
-  animation: border .3s;
+  border-radius: 8px;
+  animation: wtf 3s ease-in-out forwards;
+}
+
+@keyframes wtf {
+  0% {
+    transform: rotate3d(1, 0, 0, 0);
+  }
+  100% {
+    transform: rotate3d(101, 0, 1, 360deg);
+  }
 }
 
 .auth-content-1 {
