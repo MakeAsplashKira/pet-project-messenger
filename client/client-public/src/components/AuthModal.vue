@@ -594,6 +594,8 @@ onUnmounted(()=> {
     height: 80px;
     background-color: #0e1621;
     font-weight: bold;
+    border-top-right-radius: 8px;
+    border-top-left-radius: 8px;
     box-shadow: 0px 4px 8px black;
     animation: 1s ease-in-out start-auth-header-anim;
 }
@@ -1005,6 +1007,8 @@ onUnmounted(()=> {
   justify-content: space-between;
   right: 0;
   height: 80px;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
   background-color: #0e1621;
   box-shadow: 0px -4px 8px black;
   animation: 1s ease-in-out start-verif-anim;
