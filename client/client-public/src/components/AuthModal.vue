@@ -404,12 +404,6 @@ const verifyCode = async () => {
       notify.error(error.response?.data?.message || error.message)
       console.error('Ошибка: ', error.response?.data?.message || error.message)
     }
-    try {
-   
-      
-    }
-    catch (error) {
-    }
   } else notify.warning('Неверный синтаксис!')
   
 };
@@ -488,26 +482,32 @@ const validateEmail = async  () => {
 
 const completeRegistration = async () => {
   if (!bottomButtonActive.value) return
-
+  
   if (regStep.value == 1) {
     try {
-      const {data} = await registerUser({
+      const authStore = useAuthStore()
+
+      const data = await authStore.register({
         username: username.value,
         email: email.value,
         password: password.value
       })
-      if (data?.status=='success') {
-        //*JWT авторизация СДЕЛАТЬ!!!
+      console.log('REG RESULT: ', data)
+      if (data?.success) {
+        notify.success('Регистрация прошла успешно!')
+        closeAuthModal()
+      } else {
+        notify.error(data.error || "Ошибка регистрации")
       }
     }
     catch(error) {
-      console.error('Ошибка: ', error.response?.data?.message || error.message)
+      notify.error('Неизвестная ошибка при регистрации')
+      console.error('Registration error:', error? 'Some error':'Some error')
     }
   } 
 };
 
 const closeAuthModal = () => {
-  auth.isAuthenticated = true;
   auth.authModalOpen = false;
 }
 

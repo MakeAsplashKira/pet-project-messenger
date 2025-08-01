@@ -28,11 +28,15 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   
-  if (to.meta.requiresAuth && !authStore.isAuth) {
-    authStore.openAuthModal() // Открываем модалку
-    next(true) // Отменяем текущую навигацию
-  } else {
-    next() // Продолжаем навигацию
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    authStore.closeAuthModal()
+    
+    if(!authStore.authModalOpen) {
+      authStore.openAuthModal()
+    }
+
+    return next(from.path === '/' ? false : from.path)
   }
+  next()
 })
 export default router

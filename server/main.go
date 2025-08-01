@@ -4,7 +4,9 @@ import (
 	"log"
 	"messenger/internal/config"
 	"messenger/internal/handlers"
+	"messenger/internal/middleware"
 	"net/http"
+	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -14,11 +16,16 @@ func main() {
 	if err := godotenv.Load("data.env"); err != nil {
 		log.Fatal("Не удалось загрузить data.env: ", err)
 	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET не находится в .env файле!")
+	}
+
 	db := config.InitDB()
 	defer db.Close()
 
 	// Роутинг
-	h := handlers.NewHandler(db)
+	h := handlers.NewHandler(db, jwtSecret)
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/check-email", h.CheckEmailAvailability)
@@ -26,6 +33,13 @@ func main() {
 	mux.HandleFunc("/api/send-verif-code", h.SendVerificationCodeHandler)
 	mux.HandleFunc("/api/check-verif-code", h.VerifyCode)
 	mux.HandleFunc("/api/reg-user", h.RegistrateNewUser)
+	mux.HandleFunc("/api/refresh-tokens", h.RefreshTokens)
+
+	protected := http.NewServeMux()
+	protected.HandleFunc("/api/logout", h.Logout)
+	protected.HandleFunc("/api/login", h.Login)
+
+	mux.Handle("/", middleware.AuthMiddleware(jwtSecret, protected))
 
 	handler := enableCORS(mux)
 
@@ -46,7 +60,6 @@ func enableCORS(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }

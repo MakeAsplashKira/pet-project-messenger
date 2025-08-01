@@ -20,6 +20,7 @@ import (
 type Handler struct {
 	db         *pgxpool.Pool
 	smtpConfig SMTPConfig
+	jwtSecret  string
 }
 type SMTPConfig struct {
 	Host     string
@@ -29,7 +30,7 @@ type SMTPConfig struct {
 	From     string
 }
 
-func NewHandler(db *pgxpool.Pool) *Handler {
+func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
 	return &Handler{
 		db: db,
 		smtpConfig: SMTPConfig{
@@ -39,6 +40,7 @@ func NewHandler(db *pgxpool.Pool) *Handler {
 			Password: os.Getenv("YANDEX_SMTP_PASSWORD"),
 			From:     "Pet-project <sanyasatana@yandex.ru>",
 		},
+		jwtSecret: jwtSecret,
 	}
 }
 

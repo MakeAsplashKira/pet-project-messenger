@@ -7,11 +7,11 @@ import Notifications from './components/Notifications.vue';
 
 const auth = useAuthStore()
 
-watch(()=>auth.isAuth, (isAuth) => {
-  if(!isAuth && !localStorage.getItem('token')) {
+watch(()=>auth.isAuthenticated, (isAuthenticated) => {
+  if(!isAuthenticated) {
     auth.openAuthModal()
   }
-})
+}, {immediate: true})
 
 </script>
 
