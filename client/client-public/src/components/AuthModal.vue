@@ -1,15 +1,49 @@
 <template>
   <div 
     class="auth-modal"
-    @click.self="closeModal"
   >
-    <div class="auth-modal__content">
-      <!-- Шаг 1: Email -->
-      <div v-if="regStep === 1" class="auth-step">
-        <div class="auth-header-1">
-            Давай зарегестрируем вас!
+    <div class="auth-modal__content" :class="{'auth-loading':isRotating}">
+        <div v-if="AuthType=='loading'" class="auth-content-loading" >
+          <div class="loading-auth-header"></div>
+          <div class="loading-auth-blocks">
+            <div v-for="value in 4" class="loading-auth-block"></div>
+          </div>
         </div>
-        <div class="email-verif-code" :class="{'email-verif-code-active': emailApproved && !emailAuthDone}">
+        <div class="auth-content-login" v-if="AuthType=='login'">
+          <div class="auth-content-header">Продолжим?</div>
+          <div class="login-content">
+            
+          </div>
+        </div>
+        <div class="auth-content-choose" v-if="AuthType =='choose'">
+          <div class="auth-content-header">Добро пожаловать! ✨</div>
+          <div class="content-choose-buttons">
+            <div class="choose-button">
+              <div class="choose-btn enter"  @click="ChangeAuthType('login')">Войти</div>
+              <div class="choose-info">
+                Вы можете <span class="choose-enter-span">войти</span><span class="choose-punct">,</span> используя <span class="choose-enter-span">сторонние сервисы</span><span class="choose-punct">.</span> Но помните<span class="choose-punct">,</span> при таком варианте входа могут быть ограничены некоторые <span class="choose-func">функции</span><span class="choose-punct">,</span> в зависимости от выбора <span class="choose-enter-span">стороннего сервиса</span><span class="choose-punct">.</span>
+              </div>
+              <div class="enter-servises">
+                  <div class="servise"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none"><g clip-path="url(#akarIconsGithubFill0)"><path fill="#ffffff" fill-rule="evenodd" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385c.6.105.825-.255.825-.57c0-.285-.015-1.23-.015-2.235c-3.015.555-3.795-.735-4.035-1.41c-.135-.345-.72-1.41-1.23-1.695c-.42-.225-1.02-.78-.015-.795c.945-.015 1.62.87 1.845 1.23c1.08 1.815 2.805 1.305 3.495.99c.105-.78.42-1.305.765-1.605c-2.67-.3-5.46-1.335-5.46-5.925c0-1.305.465-2.385 1.23-3.225c-.12-.3-.54-1.53.12-3.18c0 0 1.005-.315 3.3 1.23c.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23c.66 1.65.24 2.88.12 3.18c.765.84 1.23 1.905 1.23 3.225c0 4.605-2.805 5.625-5.475 5.925c.435.375.81 1.095.81 2.22c0 1.605-.015 2.895-.015 3.3c0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12" clip-rule="evenodd"/></g><defs><clipPath id="akarIconsGithubFill0"><path fill="#fff" d="M0 0h24v24H0z"/></clipPath></defs></g></svg></div>
+                  <div class="servise"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none"><g clip-path="url(#akarIconsGoogleContainedFill0)"><path fill="#ffffff" fill-rule="evenodd" d="M12 0C5.372 0 0 5.373 0 12s5.372 12 12 12c6.627 0 12-5.373 12-12S18.627 0 12 0m.14 19.018c-3.868 0-7-3.14-7-7.018c0-3.878 3.132-7.018 7-7.018c1.89 0 3.47.697 4.682 1.829l-1.974 1.978v-.004c-.735-.702-1.667-1.062-2.708-1.062c-2.31 0-4.187 1.956-4.187 4.273c0 2.315 1.877 4.277 4.187 4.277c2.096 0 3.522-1.202 3.816-2.852H12.14v-2.737h6.585c.088.47.135.96.135 1.474c0 4.01-2.677 6.86-6.72 6.86" clip-rule="evenodd"/></g><defs><clipPath id="akarIconsGoogleContainedFill0"><path fill="#fff" d="M0 0h24v24H0z"/></clipPath></defs></g></svg></div>
+                  <div class="servise"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#ffffff" d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.566 18.566 0 0 0-5.487 0a12.36 12.36 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055a20.03 20.03 0 0 0 5.993 2.98a.078.078 0 0 0 .084-.026a13.83 13.83 0 0 0 1.226-1.963a.074.074 0 0 0-.041-.104a13.201 13.201 0 0 1-1.872-.878a.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028a19.963 19.963 0 0 0 6.002-2.981a.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028M8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38c0-1.312.956-2.38 2.157-2.38c1.21 0 2.176 1.077 2.157 2.38c0 1.312-.956 2.38-2.157 2.38m7.975 0c-1.183 0-2.157-1.069-2.157-2.38c0-1.312.955-2.38 2.157-2.38c1.21 0 2.176 1.077 2.157 2.38c0 1.312-.946 2.38-2.157 2.38"/></svg></div>
+                  <div class="servise"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 1024 1024"><path fill="#ffffff" d="M747.4 535.7c-.4-68.2 30.5-119.6 92.9-157.5c-34.9-50-87.7-77.5-157.3-82.8c-65.9-5.2-138 38.4-164.4 38.4c-27.9 0-91.7-36.6-141.9-36.6C273.1 298.8 163 379.8 163 544.6c0 48.7 8.9 99 26.7 150.8c23.8 68.2 109.6 235.3 199.1 232.6c46.8-1.1 79.9-33.2 140.8-33.2c59.1 0 89.7 33.2 141.9 33.2c90.3-1.3 167.9-153.2 190.5-221.6c-121.1-57.1-114.6-167.2-114.6-170.7m-105.1-305c50.7-60.2 46.1-115 44.6-134.7c-44.8 2.6-96.6 30.5-126.1 64.8c-32.5 36.8-51.6 82.3-47.5 133.6c48.4 3.7 92.6-21.2 129-63.7"/></svg></div>
+              </div>
+            </div>
+            <div class="choose-button">
+              <div  @click="ChangeAuthType('register')" class="choose-btn registrate">Зарегестрироваться</div>
+              <div class="choose-info">
+                <span class="choose-enter-span">Зарегестрировавшись</span><span class="choose-punct">,</span> вы получите доступ ко всем <span class="choose-func">функциям</span> <span class="choose-enter-span">сервиса</span><span class="choose-punct">,</span> кроме <span class="choose-enter-span"> платных</span> конечно-же😉
+              </div>
+            </div>
+          </div>
+        </div>
+      <div v-if="regStep === 1 && AuthType=='register'" class="auth-step" >
+        <div class="auth-header-1" v-if="AuthType=='register'">
+           Давайте зарегестрируем вас!
+        </div>
+        <div class="auth-content-1" v-if="AuthType=='register'">
+          <div class="email-verif-code" :class="{'email-verif-code-active': emailApproved && !emailAuthDone}">
               <div class="input-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="25" cy="20" r="1" fill="#ffffff"/><path fill="#ffffff" d="M19.414 30H15v-4.414l5.034-5.034A4.607 4.607 0 0 1 20 20a5 5 0 1 1 4.448 4.966zM17 28h1.586l5.206-5.206l.54.124a3.035 3.035 0 1 0-2.25-2.25l.124.54L17 26.414zM6 8h2v8H6zM2 8h2v8H2zm16 0h2v6h-2zm-4 8h-2a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2m-2-2h2v-4h-2zM2 18h2v8H2zm12 0h2v4h-2zm-4 8H8a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2m-2-2h2v-4H8zM2 2h2v4H2zm12 0h2v4h-2zm4 0h2v4h-2zm-8 4H8a2 2 0 0 1-2-2V2h2v2h2V2h2v2a2 2 0 0 1-2 2"/></svg></div>
               <input v-model="code" type="text" class="verify-input" placeholder="code">
               <div class="send-code-container">
@@ -20,7 +54,6 @@
                 <div v-if="verifCodeStatus==0" @click="verifyCode()"  class="email-sent-btn"><svg  aria-hidden="true" display="block" viewBox="0 0 12 8" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M2.156 2.295a.75.75 0 0 1 1.051-.137L6 4.306l2.793-2.148a.75.75 0 1 1 .914 1.189l-3.25 2.5a.75.75 0 0 1-.914 0l-3.25-2.5a.75.75 0 0 1-.137-1.052" clip-rule="evenodd"></path></svg></div>         
               </div>
             </div>
-        <div class="auth-content-1">
           <div class="input-container" :class="{'email-auth-end':emailAuthDone }">
             <div class="input-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="#ffffff" d="M28 6H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2m-2.2 2L16 14.78L6.2 8ZM4 24V8.91l11.43 7.91a1 1 0 0 0 1.14 0L28 8.91V24Z"/></svg></div>
             <input
@@ -92,24 +125,24 @@
         </div>
 
       <!-- Шаг 2: Код подтверждения -->
-      <div v-if="regStep === 2" class="auth-step">
+      <div v-show="regStep === 2 && AuthType=='register'" class="auth-step">
         <h3>Введите код из письма</h3>
       </div>
 
       <!-- Шаг 3: Профиль -->
-      <div v-if="regStep === 3" class="auth-step">
+      <div v-show="regStep === 3 && AuthType=='register'" class="auth-step">
         <h3>Создайте профиль</h3>
         
       </div>
     </div>
-    <div class="auth-modal__steps">
+    <div class="auth-modal__steps" :class="{'hide-modal__steps': AuthType != 'register'}">
         <div class="auth-steps-left">
    
             <div class="auth-step-anim" v-for="step in registrationSteps">
               <LiquidProgress :text="step.text" :fillPercent="step.fillPercent" :cSize="step.cSize" :current-stage="step.currentStage"/>
             </div>
         </div>
-        <div class="auth-anim" ref="lottieContainer"></div>
+        <div :class="{'auth-anim-on-registration' : AuthType=='register'}" class="auth-anim" ref="lottieContainer"></div>
     </div>
   </div>
 </template>
@@ -117,7 +150,6 @@
 <script setup>
 import { ref, onMounted, watch, computed, onUnmounted, watchEffect} from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useNotifications } from '@/stores/notifications';
 import lottie from 'lottie-web';
 import LiquidProgress from './anim/LiquidProgress.vue';
 import useNotify from '@/composable/useNotify';
@@ -138,6 +170,7 @@ onMounted(async () => {
     animationData: animationData.default,
     loop: true,
   });
+  notify.success('Ура','Успешная регистрация Успешная регистрация Успешная регистрацияУспешная регистрацияУспешная регистрацияУспешная регистрация Успешная регистрация Успешная регистрация Успешная регистрация')
 });
 
 const registrationSteps = ref([
@@ -150,11 +183,22 @@ const registrationSteps = ref([
 
 const AuthType = ref('choose')
 const isRotating = ref(false)
-const isLoading = ref(false)
 
 
-
-
+const ChangeAuthType = (type) => {
+  if(!isRotating.value) {
+  isRotating.value = true
+  setTimeout(()=> {
+    AuthType.value = 'loading'
+  }, 1050)
+  setTimeout(()=> {
+    AuthType.value = type
+  }, 2000)
+  setTimeout(()=> {
+    isRotating.value = false
+  }, 3000)
+  }
+}
 
 
 
@@ -533,6 +577,168 @@ onUnmounted(()=> {
 </script>
 <style scoped>
 
+.content-choose-buttons {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 80%;
+  transform: translate(-50%, -40%);
+}
+
+.choose-button {
+  transition: all .3s;
+  border-radius: 8px;
+  box-shadow: 1px 2px 8px black;
+}
+
+.choose-button:not(:first-child) {
+  margin-top: 20px;
+}
+
+.choose-btn {
+  transition: all .3s ease-in-out;
+  position: relative;
+  z-index: 3;
+  background-color: #0e1621;
+  padding: 15px;
+  cursor: pointer;
+  font-weight: bold;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  box-shadow: 0px 3px 6px black;
+}
+
+.enter:hover {
+  background-color: #00ff2a;
+  color: black;
+}
+.registrate:hover {
+  background-color: #0099ff;
+  color: black;
+}
+
+.choose-info {
+  width: 100%;
+  height: 100%;
+  color: #838383fd;
+  background-color: #1b1f25;
+  padding: 15px 10px;
+  font-size: 15px;
+  user-select: none;
+  line-height: 20px;
+}
+
+.enter-servises {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background-color: #0e1621;
+  height: 40px;
+  box-shadow: 0px -3px 6px black;
+  border-bottom-right-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.servise {
+  width: 30px;
+  height: 30px;
+  opacity: .5;
+  cursor: pointer;
+  transition: all .2s ease-in-out;
+}
+
+.servise:hover {
+  opacity: .9;
+}
+.servise > svg {
+  width: 30px;
+  height: 30px;
+}
+
+.choose-func {
+  font-size: 15px;
+  color: #dccd79;
+  font-weight: bold;
+}
+
+.choose-enter-span {
+  font-size: 15px;
+  color: #53bafff5;
+  font-weight: bold;
+}
+
+.choose-punct {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+
+.auth-content-header {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-family: sans-serif;
+  right: 0;
+  top: 0;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  height: 80px;
+  box-shadow: 0px 4px 8px black;
+  background-color: #0e1621;
+}
+
+.loading-auth-header {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #0e1621 40%, #ffffff09 50%, #0e1621 75%);
+  background-size: 200% 100%;
+  height: 80px;
+  box-shadow: 0px -4px 8px black;
+  animation: shimmer 1s infinite;
+  
+}
+
+.loading-auth-blocks {
+  display: flex;
+  width: 100%;
+  position: absolute;
+  left: 50%;
+  top:50%;
+  transform: translate(-50%, -50%);
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.loading-auth-block {
+  position: relative;
+  width: 80%;
+  height: 46px;
+  background: linear-gradient(90deg, #0e1621 40%, #ffffff09 50%, #0e1621 75%);
+  box-shadow: 2px 2px 6px black;
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 1s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+      background-position: -200% 0;
+      }
+  100% {
+      background-position: 200% 0;
+      }
+}
+
+.loading-auth-block:not(:first-child) {
+  margin-top: 30px
+}
+
 
 .auth-modal {
   position: fixed;
@@ -552,13 +758,15 @@ onUnmounted(()=> {
   background: #17212b;
   width: 100%;
   height: 500px;
-  transform: rotate3d(1, 0, 0, 0);
   max-width: 400px;
   border-radius: 8px;
-  animation: wtf 3s ease-in-out forwards;
 }
 
-@keyframes wtf {
+.auth-loading {
+  animation: rotate 3s ease-in-out forwards;
+}
+
+@keyframes rotate {
   0% {
     transform: rotate3d(1, 0, 0, 0);
   }
@@ -568,7 +776,6 @@ onUnmounted(()=> {
 }
 
 .auth-content-1 {
-  padding: 15px 0px;
   height: 100%;
 }
 
@@ -618,10 +825,13 @@ onUnmounted(()=> {
     bottom: 0;
     left: 0;
     right: 0;
-    top: 35%;
+    top: 0%;
     background-color: #17212b;
     box-shadow: 0px -1px 14px black;
-    animation: 1s ease-in-out auth-anim-move;
+    transition: all 1s ease-in-out;
+}
+.auth-anim-on-registration {
+  top: 35%;
 }
 
 .auth-steps-left {
@@ -765,7 +975,7 @@ onUnmounted(()=> {
   padding: 5px;
   pointer-events: none;
   opacity: 0;
-  top: 95px;
+  top: 10px;
   border-radius: 8px;
   background-color: #0e1621;
   box-shadow: 2px 3px 4px black;
@@ -774,7 +984,7 @@ onUnmounted(()=> {
 
 .email-verif-code-active {
   opacity: 1;
-  top: 150px;
+  top: 160px;
   pointer-events: all;
 }
 
@@ -859,6 +1069,8 @@ onUnmounted(()=> {
 }
 
 .password-strength-container {
+  user-select: none;
+  pointer-events: none;
   position: absolute;
   left: 50%;
   top: 50%;
@@ -1031,6 +1243,7 @@ onUnmounted(()=> {
   user-select: none;
   color: #ffffffce;
 }
+
 
 .next-step-button {
   display: flex;

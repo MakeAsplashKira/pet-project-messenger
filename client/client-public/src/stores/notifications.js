@@ -10,6 +10,7 @@ export const useNotifications = defineStore('notifications', {
             const newNotification = {
                 id,
                 message: notification.message,
+                title: notification.title || notification.type,
                 type: notification.type || 'info',
                 timeout: notification.timeout || 10000
             }

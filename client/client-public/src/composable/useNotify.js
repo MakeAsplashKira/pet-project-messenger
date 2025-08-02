@@ -4,9 +4,10 @@ export default function() {
   const notifyStore = useNotifications()
   
   const notify = {
-    success: (msg) => notifyStore.addNotification({ message: msg, type: 'success' }),
-    error: (msg) => notifyStore.addNotification({ message: msg, type: 'error' }),
-    warning: (msg) => notifyStore.addNotification({ message: msg, type: 'warning' })
+    success: (title, msg) => notifyStore.addNotification({ message: msg, title: title, type: 'success'}),
+    error: (title, msg) => notifyStore.addNotification({ message: msg, title: title, type: 'error'}),
+    warning: (title, msg) => notifyStore.addNotification({ message: msg, title: title, type: 'warning'}),
+    info: (title, msg) => notifyStore.addNotification({ message: msg, title: title, type: 'info'})
   }
   
   return { notify }

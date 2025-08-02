@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
 )
 
 type Username struct {
@@ -20,7 +19,7 @@ func (h *Handler) CheckUsernameAvailability(w http.ResponseWriter, r *http.Reque
 	var exists bool
 	err := h.db.QueryRow(context.Background(),
 		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
-		strings.ToLower(req.Username),
+		req.Username,
 	).Scan(&exists)
 
 	if err != nil {
