@@ -46,8 +46,8 @@ watch(()=>auth.isAuthenticated, (isAuthenticated) => {
   display: flex;
   justify-content: center;
   width: 100%;
-  min-height: calc(100vh - 80px);
-  margin-top: 80px;
+  min-height: calc(100vh - 100px);
+  margin-top: 100px;
   background-color: #0e1621;
   padding: 0 20px;
   padding-top: 20px;

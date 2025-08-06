@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
 import api, { logoutUser, registerUser, loginUser, refreshTokensByServer} from '@/api';
+import useNotify from '@/composable/useNotify';
 
 
 export const useAuthStore = defineStore('auth', () => {
-  const router = useRouter();
-  
+  const {notify} = useNotify()
   // State
   const accessToken = ref(null);
   const user = ref(null);
@@ -23,12 +22,18 @@ export const useAuthStore = defineStore('auth', () => {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   };
   
-  const clearAuth = () => {
+ const clearAuth = () => {
+  try {
     accessToken.value = null;
     user.value = null;
     localStorage.removeItem('accessToken');
-    delete api.defaults.headers.common['Authorization'];
-  };
+    if (api?.defaults?.headers?.common?.Authorization) {
+      delete api.defaults.headers.common['Authorization'];
+    }
+  } catch (error) {
+    console.error('clearAuth error:', error);
+  }
+};
   
   const openAuthModal = (step = 1) => {
     authModalOpen.value = true;
@@ -64,12 +69,13 @@ const register = async (userData) => {
     }
     }
 };
-  const login = async (credentials) => {
+  const login = async (userData) => {
     try {
-      const { data } = await loginUser(credentials);
-      setAuth(data.accessToken);
+      const { data } = await loginUser(userData);
+      setAuth(data.access_token);
       user.value = data.user;
       closeAuthModal();
+      notify.success('Успех', 'Вы успешно вошли в аккаунт')
       return { success: true };
     } catch (error) {
       return {
@@ -81,10 +87,15 @@ const register = async (userData) => {
   
   const logout = async () => {
     try {
-      await logoutUser();
-    } finally {
-      clearAuth();
-      router.push('/');
+      const {data} = await logoutUser();
+      if(data?.status == 'success') {
+        console.log(data)
+        clearAuth();
+        notify.success('Успех', 'Вы усешно вышли из аккаунта')
+      }
+    }
+    catch(error) {
+      notify.error('Ошибка', 'Не удалось выйти из аккаунта')
     }
   };
 
@@ -108,7 +119,7 @@ const register = async (userData) => {
 
   const checkAuth = async () => {
    if (accessToken.value) {
-        if(!isTokenExpired) {
+        if(!isTokenExpired(accessToken.value)) {
             return true
         }
    }

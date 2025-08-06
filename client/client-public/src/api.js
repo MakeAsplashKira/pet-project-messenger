@@ -31,8 +31,8 @@ export const VerifyCodeOnServer = (email, code) => {
     return api.post('/api/check-verif-code', {email, code})
 }
 
-export const  loginUser = (credentials) => {
-  return api.post('/api/login', credentials)
+export const  loginUser = (userData) => {
+  return api.post('/api/login', userData)
 }
 
 export const refreshTokensByServer =() => {

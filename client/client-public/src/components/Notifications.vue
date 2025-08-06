@@ -19,7 +19,7 @@
       <div class="notification-close" @click="remove(notification.id)">
         <svg  aria-hidden="true" display="block" viewBox="0 0 24 24" fill="currentColor"><path d="M7.536 6.264a.9.9 0 0 0-1.272 1.272L10.727 12l-4.463 4.464a.9.9 0 0 0 1.272 1.272L12 13.273l4.464 4.463a.9.9 0 1 0 1.272-1.272L13.273 12l4.463-4.464a.9.9 0 1 0-1.272-1.272L12 10.727z"></path></svg>
       </div>
-      <div class="notification-copy" @click="copieToClipboard(notification.message)">
+      <div v-if="notification.message" class="notification-copy" @click="copieToClipboard(notification.message)">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#ffffff" d="M3.25 9A5.75 5.75 0 0 1 9 3.25h7.013a.75.75 0 0 1 0 1.5H9A4.25 4.25 0 0 0 4.75 9v7.107a.75.75 0 0 1-1.5 0z"/><path fill="#ffffff" d="M18.403 6.793a44.372 44.372 0 0 0-9.806 0a2.011 2.011 0 0 0-1.774 1.76a42.581 42.581 0 0 0 0 9.894a2.01 2.01 0 0 0 1.774 1.76c3.241.362 6.565.362 9.806 0a2.01 2.01 0 0 0 1.774-1.76a42.579 42.579 0 0 0 0-9.894a2.011 2.011 0 0 0-1.774-1.76"/></svg>
       </div>
     </div>
@@ -54,7 +54,6 @@ export default {
   bottom: 20px;
   left: 20px;
   z-index: 1000;
-  box-shadow: 0px 2px 6px black;
 }
 
 .notifications {
@@ -63,7 +62,16 @@ export default {
   color: white;
   max-width: 300px;
   box-shadow: 0 3px 6px black;
-  border-top-left-radius: 8px;
+  animation: notifictaion-appear 1s ease-in-out;
+}
+
+@keyframes notifictaion-appear {
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
 }
 
 .notification-info {
@@ -122,7 +130,6 @@ export default {
   padding-right: 40px;
   font-size: 15px;
   margin-left: 10px;
-  min-height: 70px;
 }
 
 .notification-title {

@@ -30,7 +30,7 @@ type AuthClaims struct {
 }
 
 type LoginRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -110,8 +110,8 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	var user User
 	err := h.db.QueryRow(context.Background(),
-		"SELECT user_id, username, password_hash from users WHERE username = $1",
-		req.Username,
+		"SELECT user_id, email, password_hash from users WHERE email = $1",
+		req.Email,
 	).Scan(&user.ID, &user.Username, &user.Password)
 
 	if err != nil {
@@ -127,9 +127,19 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	tokens, err := h.generateTokens(user.ID)
 	if err != nil {
 		http.Error(w, "Ошибка при генерации токена: ", http.StatusInternalServerError)
+
 		return
 	}
 
+	_, err = h.db.Exec(context.Background(),
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		user.ID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
+	if err != nil {
+		http.Error(w, "Ошибка при сохранении refresh токена", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    tokens.RefreshToken,
@@ -137,8 +147,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 		Path:     "/",
 		MaxAge:   int(refreshTokenExp.Seconds()),
+		SameSite: http.SameSiteStrictMode,
 	})
 
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
 		"access_token": tokens.AccessToken,
 		"status":       "success",

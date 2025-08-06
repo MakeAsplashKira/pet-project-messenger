@@ -1,9 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import lottie from 'lottie-web';
-import { logoutUser } from '@/api';
+import { useAuthStore } from '@/stores/auth';
+import Player from '../player/Player.vue';
 
 const lottieContainer = ref(null);
+
+const auth = useAuthStore()
 
 onMounted(async () => {
   const animationData = await import('@/assets/logo-animation.json');
@@ -14,6 +17,10 @@ onMounted(async () => {
     loop: true,
   });
 });
+
+const logout = async() => {
+  const data = await auth.logout()
+}
 </script>
 
 <template>
@@ -23,8 +30,8 @@ onMounted(async () => {
             <div ref="lottieContainer" class="logo-animation"></div> 
             <div class="site-name">MediaVerse</div>
         </div>
-        <div class="header-main">тут что-то будет</div>
-        <div @click="logoutUser" class="vihjod" style="cursor: pointer;">Выход</div>
+        <Player/>
+        <div @click="logout" class="vihjod" style="cursor: pointer;">Выход</div>
         <div class="header-profile" @click="$router.push('/profile')"></div>
     </div>
   </div>
@@ -35,15 +42,12 @@ onMounted(async () => {
 
 .header-wrapper {
   position: fixed;
-  top: 0%;
+  top: 20px;
   width: 100%;
   height: 80px;
-  background-color: #17212b;
   display: flex;
+  background-color: #0e1621;
   justify-content: center;
-  -webkit-box-shadow: 0px 6px 20px -3px rgb(0, 0, 0);
-  -moz-box-shadow: 0px 6px 20px -3px rgb(0, 0, 0);
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
 }
 
 
@@ -57,7 +61,11 @@ onMounted(async () => {
   min-width: 600px;
   width: 100%;
   height: 100%;
+  background-color: #17212b;
   align-items: center;
+  box-shadow: 0px 1px 8px black;
+  border-radius: 8px;
+  margin: 0 20px;
 }
 
 .header-logo {

@@ -12,7 +12,19 @@
         <div class="auth-content-login" v-if="AuthType=='login'">
           <div class="auth-content-header">Продолжим?</div>
           <div class="login-content">
-            
+            <div class="input-container login">
+              <div class="input-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="#ffffff" d="M28 6H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2m-2.2 2L16 14.78L6.2 8ZM4 24V8.91l11.43 7.91a1 1 0 0 0 1.14 0L28 8.91V24Z"/></svg></div>
+              <input v-model="loginEmail" type="email" placeholder="Введите ваш E-mail">
+            </div>
+            <div class="input-container">
+              <div class="input-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="#ffffff" d="M21 2a8.998 8.998 0 0 0-8.612 11.612L2 24v6h6l10.388-10.388A9 9 0 1 0 21 2m0 16a7.013 7.013 0 0 1-2.032-.302l-1.147-.348l-.847.847l-3.181 3.181L12.414 20L11 21.414l1.379 1.379l-1.586 1.586L9.414 23L8 24.414l1.379 1.379L7.172 28H4v-3.172l9.802-9.802l.848-.847l-.348-1.147A7 7 0 1 1 21 18"/><circle cx="22" cy="10" r="2" fill="#ffffff"/></svg></div>
+              <input v-model="loginPassword" :type="showPassword?'text':'password'" placeholder="Введите пароль...">
+              <div class="password-show" @click="tooglePassowrdShowing">
+                <div class="password-show-icon" :style="{opacity: showPassword? .8 : 0}"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.257 10.962c.474.62.474 1.457 0 2.076C19.764 14.987 16.182 19 12 19c-4.182 0-7.764-4.013-9.257-5.962a1.692 1.692 0 0 1 0-2.076C4.236 9.013 7.818 5 12 5c4.182 0 7.764 4.013 9.257 5.962"/><circle cx="12" cy="12" r="3"/></g></svg></div>
+                <div class="password-hide-icon" :style="{opacity: !showPassword? .8 : 0}"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 10s3.5 4 10 4s10-4 10-4M4 11.645L2 14m20 0l-1.996-2.352M8.914 13.68L8 16.5m7.063-2.812L16 16.5"/></svg></div>
+              </div>
+            </div>
+            <div @click="completeLogin()" class="login-button">Войти</div>
           </div>
         </div>
         <div class="auth-content-choose" v-if="AuthType =='choose'">
@@ -170,8 +182,30 @@ onMounted(async () => {
     animationData: animationData.default,
     loop: true,
   });
-  notify.success('Ура','Успешная регистрация Успешная регистрация Успешная регистрацияУспешная регистрацияУспешная регистрацияУспешная регистрация Успешная регистрация Успешная регистрация Успешная регистрация')
 });
+
+const loginEmail = ref('')
+const loginPassword = ref('')
+
+const completeLogin = async() => {
+  if(loginEmail.value.length > 3 && loginPassword.value.length > 8) {
+    try {
+      const authStore = useAuthStore()
+      const data = authStore.login({
+        email: loginEmail.value,
+        password: loginPassword.value
+      })
+    }
+    catch(error) {
+
+    }
+  }
+  else {
+    notify.warning('Неудача', 'Поля должны быть заполнены...')
+  }
+}
+
+
 
 const registrationSteps = ref([
   {text:'1',fillPercent: 0, cSize: 70, currentStage: true},
@@ -190,13 +224,13 @@ const ChangeAuthType = (type) => {
   isRotating.value = true
   setTimeout(()=> {
     AuthType.value = 'loading'
-  }, 1050)
+  }, 100)
   setTimeout(()=> {
     AuthType.value = type
-  }, 2000)
+  }, 400)
   setTimeout(()=> {
     isRotating.value = false
-  }, 3000)
+  }, 600)
   }
 }
 
@@ -311,6 +345,7 @@ watchEffect(() => {
   
   bottomButtonActive.value = conditions.every(Boolean)
 })
+
 const passwordStrength = computed(() => {
   const pass = password.value;
   if (pass.length === 0) return 0;
@@ -392,14 +427,14 @@ const validateUNonServer = async(username) => {
       isUNvalidByServer.value = true
       if(!isUNAnimChanged.value) {
         isUNAnimChanged.value = true
-        updateCurrentStepFillPercent(15)
+        updateCurrentStepFillPercent(20)
       }
     }
     else {
       isUNvalidByServer.value = false
       if(isUNAnimChanged.value) {
         isUNAnimChanged.value = false
-        updateCurrentStepFillPercent(-15)
+        updateCurrentStepFillPercent(-20)
       }
     }
   }
@@ -443,7 +478,6 @@ const sendVerifCode = async() => {
     }
     
   } else notify.warning('Вы уже отправляли код аутентификации!')
-  
 }
 
 const verifyCode = async () => {
@@ -524,14 +558,14 @@ const validateEmail = async  () => {
       }
       emailReadyToSend.value = true
     } else if(!data?.available) {
-      notify.error('E-mail уже занят!')
+      notify.error('E-mail', 'Данный E-mail уже занят, выберите другой...')
       emailStatus.value = -1
       emailApproved.value = false
       emailReadyToSend.value = false
     }
   }
   catch (error) {
-    notify.error('Ошибка сервера при проверке E-mail')
+    notify.error('E-mail', error)
     emailStatus.value = -1
     emailApproved.value = false
     emailReadyToSend.value = false
@@ -550,7 +584,6 @@ const completeRegistration = async () => {
         email: email.value,
         password: password.value
       })
-      console.log('REG RESULT: ', data)
       if (data?.success) {
         notify.success('Регистрация прошла успешно!')
         closeAuthModal()
@@ -654,6 +687,27 @@ onUnmounted(()=> {
   height: 30px;
 }
 
+.login-button {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  padding: 10px 15px;
+  width: 150px;
+  text-align: center;
+  border-radius: 8px;
+  background-color: #0e1621;
+  box-shadow: 3px 3px 6px black;
+  cursor: pointer;
+  user-select: none;
+  font-weight: bold;
+  transition: all .3s ease-in-out;
+}
+
+.login-button:hover {
+  color: black;
+  background-color: #00ff15;
+}
+
 .choose-func {
   font-size: 15px;
   color: #dccd79;
@@ -693,7 +747,7 @@ onUnmounted(()=> {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  top: 0;
   background: linear-gradient(90deg, #0e1621 40%, #ffffff09 50%, #0e1621 75%);
   background-size: 200% 100%;
   height: 80px;
@@ -713,6 +767,10 @@ onUnmounted(()=> {
   align-items: center;
   justify-content: center;
   flex-direction: column;
+}
+
+.login {
+  margin-top: 100px;
 }
 
 .loading-auth-block {
@@ -763,17 +821,8 @@ onUnmounted(()=> {
 }
 
 .auth-loading {
-  animation: rotate 3s ease-in-out forwards;
 }
 
-@keyframes rotate {
-  0% {
-    transform: rotate3d(1, 0, 0, 0);
-  }
-  100% {
-    transform: rotate3d(101, 0, 1, 360deg);
-  }
-}
 
 .auth-content-1 {
   height: 100%;

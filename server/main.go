@@ -34,10 +34,10 @@ func main() {
 	mux.HandleFunc("/api/check-verif-code", h.VerifyCode)
 	mux.HandleFunc("/api/reg-user", h.RegistrateNewUser)
 	mux.HandleFunc("/api/refresh-tokens", h.RefreshTokens)
+	mux.HandleFunc("/api/login", h.Login)
 
 	protected := http.NewServeMux()
 	protected.HandleFunc("/api/logout", h.Logout)
-	protected.HandleFunc("/api/login", h.Login)
 
 	mux.Handle("/", middleware.AuthMiddleware(jwtSecret, protected))
 
