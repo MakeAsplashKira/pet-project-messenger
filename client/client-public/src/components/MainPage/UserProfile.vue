@@ -133,12 +133,12 @@
 .user-profile-main-edit > svg {
     width: 24px;
     height: 24px;
-    opacity: .6;
+    fill: rgba(255, 255, 255, 0.6);
     transition: all .2s ease-in-out;
 }
 
 .user-profile-main-edit > span {
-    opacity: .6;
+    color: #ffffff98;
     margin-left: 5px;
     transition: all .2s ease-in-out;
 }
@@ -149,11 +149,11 @@
 }
 
 .user-profile-main-edit:hover > svg {
-    opacity: .9;
+    fill: #ffffffde;
 }
 
 .user-profile-main-edit:hover > span {
-    opacity: .9;
+    color: rgba(255,255,255, .9);
 }
 
 .user-profile-section-mf {
