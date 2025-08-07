@@ -5,13 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"net/smtp"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type EmailHandler struct {
@@ -50,12 +50,13 @@ type VerificationCode struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-func (h *EmailHandler) CheckEmailAvailability(w http.ResponseWriter, r *http.Request) {
+func (h *EmailHandler) CheckEmailAvailability(c *gin.Context) {
 	var req EmailCheckRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
+
 	var exists bool
 	err := h.DB.QueryRow(context.Background(),
 		"SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)",
@@ -63,19 +64,13 @@ func (h *EmailHandler) CheckEmailAvailability(w http.ResponseWriter, r *http.Req
 	).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, "Ошибка базы данных", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Ошибка базы данных"})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]bool{
+	c.JSON(200, gin.H{
 		"available": !exists,
 	})
-}
-
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }
 
 func generateRandomCode() (string, error) {
@@ -87,21 +82,16 @@ func generateRandomCode() (string, error) {
 	return fmt.Sprintf("%06d", n%1000000), nil
 }
 
-func (h *EmailHandler) SendVerificationCodeHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h *EmailHandler) SendVerificationCodeHandler(c *gin.Context) {
 	var req EmailCheckRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
 	code, err := generateRandomCode()
 	if err != nil {
-		http.Error(w, "Failed to generate verification code", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Не удалось сгенерировать код"})
 		return
 	}
 
@@ -115,54 +105,53 @@ func (h *EmailHandler) SendVerificationCodeHandler(w http.ResponseWriter, r *htt
 		"DELETE FROM verification_codes WHERE email = $1",
 		req.Email)
 	if err != nil {
-		http.Error(w, "Failed to delete old codes", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Ошибка при удалении старых кодов"})
 		return
 	}
+
 	_, err = h.DB.Exec(ctx,
 		"INSERT INTO verification_codes (email, code, created_at, expires_at) VALUES ($1, $2, $3, $4)",
 		req.Email, code, createdAt, expiresAt,
 	)
 	if err != nil {
-		http.Error(w, "Failed to save verification code", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Ошибка при сохранении кода"})
 		return
 	}
 
 	subject := "Код подтверждения для MediaVerse"
 	body := fmt.Sprintf(`
-	    Здравствуйте!
+	Здравствуйте!
 
-	    Ваш код подтверждения: %s
-	    Действителен до: %s
+	Ваш код подтверждения: %s
+	Действителен до: %s
 
-	    Никому не сообщайте этот код!`,
+	Никому не сообщайте этот код!`,
 		code, expiresAt.Format("15:04 02.01.2006"))
 
 	if err := h.sendEmail(req.Email, subject, body); err != nil {
-		log.Println("Ошибка отправки  E-mail! ", err)
-		http.Error(w, "Не удалось отправить код", http.StatusInternalServerError)
+		log.Println("Ошибка отправки E-mail: ", err)
+		c.JSON(500, gin.H{"error": "Не удалось отправить код"})
 		return
 	}
+
 	fmt.Printf("Вот твой код бро: %v для E-mail: %v\n", code, req.Email)
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	c.JSON(200, gin.H{
 		"status":  "success",
 		"message": "Код отправлен на email",
 	})
 }
 
 func (h *EmailHandler) sendEmail(to, subject, body string) error {
-	// 1. Формируем письмо
 	msg := fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
 		h.smtpConfig.From, to, subject, body,
 	)
 
-	// 2. Настройка TLS
 	tlsConfig := &tls.Config{
 		ServerName: h.smtpConfig.Host,
 	}
 
-	// 3. Подключение
 	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", h.smtpConfig.Host, h.smtpConfig.Port), tlsConfig)
 	if err != nil {
 		return fmt.Errorf("Ошибка подключения: %v", err)
@@ -171,57 +160,44 @@ func (h *EmailHandler) sendEmail(to, subject, body string) error {
 
 	client, err := smtp.NewClient(conn, h.smtpConfig.Host)
 	if err != nil {
-		return fmt.Errorf("Ошибка SMTP-клиента: %v.", err)
+		return fmt.Errorf("Ошибка SMTP-клиента: %v", err)
 	}
 	defer client.Close()
 
-	// 4. Аутентификация
-	log.Printf(
-		"Auth details: host=%s, user=%s, pass=%v",
-		h.smtpConfig.Host,
-		h.smtpConfig.Username,
-		h.smtpConfig.Password != "",
-	)
 	if err = client.Auth(smtp.PlainAuth(
 		"",
 		h.smtpConfig.Username,
 		h.smtpConfig.Password,
 		h.smtpConfig.Host,
 	)); err != nil {
-		return fmt.Errorf("Ошибка аутентификации: %v.", err)
+		return fmt.Errorf("Ошибка аутентификации: %v", err)
 	}
 
-	// 5. Отправка
 	if err = client.Mail(h.smtpConfig.Username); err != nil {
-		return fmt.Errorf("Ошибка отправителя: %v.", err)
+		return fmt.Errorf("Ошибка отправителя: %v", err)
 	}
 	if err = client.Rcpt(to); err != nil {
-		return fmt.Errorf("Ошибка получателя: %v.", err)
+		return fmt.Errorf("Ошибка получателя: %v", err)
 	}
 
 	w, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("Ошибка данных: %v.", err)
+		return fmt.Errorf("Ошибка данных: %v", err)
 	}
 	if _, err = w.Write([]byte(msg)); err != nil {
-		return fmt.Errorf("Ошибка записи: %v.", err)
+		return fmt.Errorf("Ошибка записи: %v", err)
 	}
 	if err = w.Close(); err != nil {
-		return fmt.Errorf("Ошибка закрытия: %v.", err)
+		return fmt.Errorf("Ошибка закрытия: %v", err)
 	}
 
 	return client.Quit()
 }
 
-func (h *EmailHandler) VerifyCode(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h *EmailHandler) VerifyCode(c *gin.Context) {
 	var req VerificationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -241,30 +217,23 @@ func (h *EmailHandler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 	).Scan(&dbCode.Code, &dbCode.ExpiresAt)
 
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "Verification code not found or expired",
-		})
+		c.JSON(400, gin.H{"error": "Код не найден или истёк"})
 		return
 	}
 
 	if dbCode.Code != req.Code {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "Invalid verification code",
-		})
+		c.JSON(400, gin.H{"error": "Неверный код"})
 		return
 	}
 
-	// Если код верный, помечаем email как подтвержденный
 	_, err = h.DB.Exec(ctx,
 		"UPDATE verification_codes SET is_used = true WHERE email = $1 AND code = $2",
 		req.Email, req.Code,
 	)
 	if err != nil {
-		http.Error(w, "Failed to verify email", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Ошибка при подтверждении email"})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
-		"status": "success",
-	})
+	c.JSON(200, gin.H{"status": "success"})
 }

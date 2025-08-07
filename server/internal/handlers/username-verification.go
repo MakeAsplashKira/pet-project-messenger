@@ -2,20 +2,22 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Username struct {
 	Username string `json:"username"`
 }
 
-func (h *Handler) CheckUsernameAvailability(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CheckUsernameAvailability(c *gin.Context) {
 	var req Username
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
+
 	var exists bool
 	err := h.DB.QueryRow(context.Background(),
 		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
@@ -23,11 +25,11 @@ func (h *Handler) CheckUsernameAvailability(w http.ResponseWriter, r *http.Reque
 	).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, "Ошибка базы данных", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]bool{
+	c.JSON(http.StatusOK, gin.H{
 		"available": !exists,
 	})
 }

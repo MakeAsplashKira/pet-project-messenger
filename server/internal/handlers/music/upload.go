@@ -5,101 +5,104 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"time"
 
 	"github.com/faiface/beep/mp3"
+	"github.com/gin-gonic/gin"
 )
 
-func (h *MusicHandler) UploadTrackHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	err := r.ParseMultipartForm(50 << 20) // увеличил лимит, если треки могут быть крупнее
+func (h *MusicHandler) UploadTrackHandler(c *gin.Context) {
+	// --- Получаем трек ---
+	trackHeader, err := c.FormFile("track_file")
 	if err != nil {
-		http.Error(w, "Could not parse multipart form", http.StatusBadRequest)
+		c.JSON(400, gin.H{"error": "Трек обязателен для загрузки"})
 		return
 	}
-
-	// --- Читаем трек в память ---
-	file, header, err := r.FormFile("track_file")
+	trackFile, err := trackHeader.Open()
 	if err != nil {
-		http.Error(w, "Track file is required", http.StatusBadRequest)
+		c.JSON(500, gin.H{"error": "Не удалось открыть трек-файл"})
 		return
 	}
-	defer file.Close()
+	defer trackFile.Close()
 
 	var trackBuf bytes.Buffer
-	if _, err := io.Copy(&trackBuf, file); err != nil {
-		http.Error(w, "Failed to read track file", http.StatusInternalServerError)
+	if _, err := io.Copy(&trackBuf, trackFile); err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось прочитать трек"})
 		return
 	}
 
-	// --- Читаем обложку в память (если есть) ---
+	// --- Получаем обложку (необязательно) ---
 	var coverBuf bytes.Buffer
 	var coverFileName string
-	coverFile, coverHeader, err := r.FormFile("cover_image")
+	coverHeader, err := c.FormFile("cover_image")
 	if err == nil {
+		coverFile, err := coverHeader.Open()
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Не удалось открыть обложку"})
+			return
+		}
 		defer coverFile.Close()
+
 		if _, err := io.Copy(&coverBuf, coverFile); err != nil {
-			http.Error(w, "Failed to read cover file", http.StatusInternalServerError)
+			c.JSON(500, gin.H{"error": "Не удалось прочитать обложку"})
 			return
 		}
 		coverFileName = fmt.Sprintf("uploaded_covers/%d_%s", time.Now().UnixNano(), coverHeader.Filename)
 	}
 
-	title := r.FormValue("title")
-	albumID := r.FormValue("album_id")
-	artistID := r.FormValue("artist_id")
-	uploaderID := r.FormValue("uploader_id")
+	// --- Метаданные ---
+	title := c.PostForm("title")
+	albumID := c.PostForm("album_id")
+	artistID := c.PostForm("artist_id")
+	uploaderID := c.PostForm("uploader_id")
 
-	// --- Записываем трек временно в память (чтобы получить длительность) ---
-	tmpTrackPath := fmt.Sprintf("tmp/%d_%s", time.Now().UnixNano(), header.Filename)
-	err = os.WriteFile(tmpTrackPath, trackBuf.Bytes(), 0644)
-	if err != nil {
-		http.Error(w, "Failed to write temp track file", http.StatusInternalServerError)
+	// --- Временное сохранение трека ---
+	tmpTrackPath := fmt.Sprintf("tmp/%d_%s", time.Now().UnixNano(), trackHeader.Filename)
+	if err := os.WriteFile(tmpTrackPath, trackBuf.Bytes(), 0644); err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось записать временный файл"})
 		return
 	}
-	defer os.Remove(tmpTrackPath) // Удалим временный файл после
+	defer os.Remove(tmpTrackPath)
 
+	// --- Длительность трека ---
 	duration, err := GetMP3Duration(tmpTrackPath)
 	if err != nil {
-		http.Error(w, "Failed to get track duration: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Ошибка при получении длительности: " + err.Error()})
 		return
 	}
 
-	// --- Вставляем в базу, генерируем имена файлов для окончательного хранения ---
-	trackFileName := fmt.Sprintf("uploaded_tracks/%d_%s", time.Now().UnixNano(), header.Filename)
+	// --- Генерация имени и запись в базу ---
+	trackFileName := fmt.Sprintf("uploaded_tracks/%d_%s", time.Now().UnixNano(), trackHeader.Filename)
 
 	_, err = h.DB.Exec(context.Background(),
-		`INSERT INTO tracks (album_id, artist_id, title, file_path, file_size, plays_count, uploader_id, created_at, cover_path, duration)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		albumID, artistID, title, trackFileName, header.Size, 0, uploaderID, time.Now(), coverFileName, duration)
+		`INSERT INTO tracks 
+		(album_id, artist_id, title, file_path, file_size, plays_count, uploader_id, created_at, cover_path, duration)
+		VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)`,
+		albumID, artistID, title, trackFileName, trackHeader.Size, uploaderID, time.Now(), coverFileName, duration)
+
 	if err != nil {
-		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Ошибка базы данных: " + err.Error()})
 		return
 	}
 
-	// --- После успешной вставки записываем файлы на диск ---
-	err = os.WriteFile(trackFileName, trackBuf.Bytes(), 0644)
-	if err != nil {
-		http.Error(w, "Failed to save track file", http.StatusInternalServerError)
+	// --- Сохраняем файлы на диск ---
+	if err := os.WriteFile(trackFileName, trackBuf.Bytes(), 0644); err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось сохранить трек"})
 		return
 	}
 
 	if coverFileName != "" {
-		err = os.WriteFile(coverFileName, coverBuf.Bytes(), 0644)
-		if err != nil {
-			http.Error(w, "Failed to save cover file", http.StatusInternalServerError)
+		if err := os.WriteFile(coverFileName, coverBuf.Bytes(), 0644); err != nil {
+			c.JSON(500, gin.H{"error": "Не удалось сохранить обложку"})
 			return
 		}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintln(w, "Track uploaded successfully")
+	c.JSON(201, gin.H{
+		"status":  "success",
+		"message": "Трек успешно загружен",
+	})
 }
 
 func GetMP3Duration(filePath string) (int, error) {
@@ -116,6 +119,5 @@ func GetMP3Duration(filePath string) (int, error) {
 	defer streamer.Close()
 
 	duration := time.Duration(streamer.Len()) * time.Second / time.Duration(format.SampleRate)
-
 	return int(duration.Seconds()), nil
 }

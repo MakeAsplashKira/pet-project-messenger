@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,13 +12,14 @@ import (
 
 	"messenger/internal/models"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	accessTokenEXP  = 15 * time.Minute   //15 Минут
-	refreshTokenExp = 7 * 24 * time.Hour //1 Неделя
+	accessTokenEXP  = 15 * time.Minute
+	refreshTokenExp = 7 * 24 * time.Hour
 )
 
 var revokedTokens sync.Map
@@ -41,21 +41,19 @@ type User struct {
 	Password string `json:"password"`
 }
 
-func (h *Handler) RegistrateNewUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RegistrateNewUser(c *gin.Context) {
 	var req User
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 	if len(req.Password) < 8 {
-		http.Error(w, "Пароль слишком короткий (минимум 8 символов)", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль слишком короткий (минимум 8 символов)"})
 		return
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-
 	if err != nil {
-		http.Error(w, "Ошибка при хешировании пароля: ", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при хешировании пароля"})
 		return
 	}
 
@@ -65,13 +63,13 @@ func (h *Handler) RegistrateNewUser(w http.ResponseWriter, r *http.Request) {
 		req.Username, req.Email, string(hashedPassword), time.Now(),
 	).Scan(&userID)
 	if err != nil {
-		http.Error(w, "Failed to save user data: ", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user data"})
 		return
 	}
 
 	tokens, err := h.generateTokens(userID)
 	if err != nil {
-		http.Error(w, "Ошибка при генерации токенов ", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при генерации токенов"})
 		return
 	}
 
@@ -79,35 +77,33 @@ func (h *Handler) RegistrateNewUser(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		userID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
 	if err != nil {
-		http.Error(w, "Ошибка при сохранении refresh токена", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при сохранении refresh токена"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    tokens.RefreshToken,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		MaxAge:   int(refreshTokenExp.Seconds()),
-		SameSite: http.SameSiteStrictMode,
-	})
+	c.SetCookie(
+		"refresh_token",
+		tokens.RefreshToken,
+		int(refreshTokenExp.Seconds()),
+		"/",
+		"",
+		true, // Secure
+		true, // HttpOnly
+	)
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	c.JSON(http.StatusCreated, gin.H{
 		"status":       "success",
 		"access_token": tokens.AccessToken,
 	})
 }
 
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
+
 	var user User
 	err := h.DB.QueryRow(context.Background(),
 		"SELECT user_id, email, password_hash from users WHERE email = $1",
@@ -115,19 +111,18 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	).Scan(&user.ID, &user.Username, &user.Password)
 
 	if err != nil {
-		http.Error(w, "Пользователь не найден: ", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь не найден"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		http.Error(w, "Неверный пароль", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный пароль"})
 		return
 	}
 
 	tokens, err := h.generateTokens(user.ID)
 	if err != nil {
-		http.Error(w, "Ошибка при генерации токена: ", http.StatusInternalServerError)
-
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при генерации токена"})
 		return
 	}
 
@@ -135,57 +130,102 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		user.ID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
 	if err != nil {
-		http.Error(w, "Ошибка при сохранении refresh токена", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при сохранении refresh токена"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    tokens.RefreshToken,
-		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-		MaxAge:   int(refreshTokenExp.Seconds()),
-		SameSite: http.SameSiteStrictMode,
-	})
+	c.SetCookie(
+		"refresh_token",
+		tokens.RefreshToken,
+		int(refreshTokenExp.Seconds()),
+		"/",
+		"",
+		true,
+		true,
+	)
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"access_token": tokens.AccessToken,
+	c.JSON(http.StatusCreated, gin.H{
 		"status":       "success",
+		"access_token": tokens.AccessToken,
 	})
 }
 
-func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	refreshCookies, err := r.Cookie("refresh_token")
+func (h *Handler) Logout(c *gin.Context) {
+	refreshCookie, err := c.Cookie("refresh_token")
 	if err == nil {
 		_, _ = h.DB.Exec(context.Background(),
 			`DELETE FROM refresh_tokens WHERE token_hash = $1`,
-			hashToken(refreshCookies.Value))
+			hashToken(refreshCookie))
 	}
 
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
 		tokenString := authHeader[7:]
 		revokedTokens.Store(tokenString, true)
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		MaxAge:   -1,
-	})
+	c.SetCookie(
+		"refresh_token",
+		"",
+		-1,
+		"/",
+		"",
+		true,
+		true,
+	)
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Logged out successfully",
 	})
 }
+
+func (h *Handler) RefreshTokens(c *gin.Context) {
+	cookie, err := c.Cookie("refresh_token")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Необходим refresh токен"})
+		return
+	}
+
+	var userID string
+	err = h.DB.QueryRow(context.Background(),
+		`DELETE FROM refresh_tokens WHERE token_hash = $1 RETURNING user_id`, hashToken(cookie)).Scan(&userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный refresh токен"})
+		return
+	}
+
+	tokens, err := h.generateTokens(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка генерации токена"})
+		return
+	}
+
+	_, err = h.DB.Exec(context.Background(),
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Ошибка сохранения токена"})
+		return
+	}
+
+	c.SetCookie(
+		"refresh_token",
+		tokens.RefreshToken,
+		int(refreshTokenExp.Seconds()),
+		"/",
+		"",
+		true,
+		true,
+	)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"status":       "success",
+		"access_token": tokens.AccessToken,
+	})
+}
+
+// Служебные функции (без изменений)
 
 func (h *Handler) generateTokens(userID string) (*models.Tokens, error) {
 	var jwtSecret = os.Getenv("JWT_SECRET")
@@ -219,49 +259,4 @@ func hashToken(token string) string {
 	h := sha256.New()
 	h.Write([]byte(token))
 	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func (h *Handler) RefreshTokens(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("refresh_token")
-	if err != nil {
-		http.Error(w, "Необходим refresh токен", http.StatusUnauthorized)
-		return
-	}
-
-	var userID string
-	err = h.DB.QueryRow(context.Background(),
-		`DELETE FROM refresh_tokens WHERE token_hash = $1 RETURNING user_id`, hashToken(cookie.Value)).Scan(&userID)
-	if err != nil {
-		http.Error(w, "Неверный refresh токен", http.StatusUnauthorized)
-		return
-	}
-
-	tokens, err := h.generateTokens(userID)
-	if err != nil {
-		http.Error(w, "Ошибка генерации токена", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = h.DB.Exec(context.Background(),
-		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-		userID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
-	if err != nil {
-		http.Error(w, "Ошибка сохранения токена", http.StatusUnauthorized)
-		return
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    tokens.RefreshToken,
-		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-		MaxAge:   int(refreshTokenExp.Seconds()),
-		SameSite: http.SameSiteStrictMode,
-	})
-
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"access_token": tokens.AccessToken,
-		"status":       "success",
-	})
 }

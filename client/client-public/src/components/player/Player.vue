@@ -20,9 +20,7 @@
              </div>
              <div class="track-duration">{{ trackData.duration }}</div>
         </div>
-        <div class="player-progress-bar-wrapper">
-            <div class="player-progress-bar"></div>
-        </div>
+        <TrackProgressBar/>
     </div>
 </div>
 </template>
@@ -30,6 +28,7 @@
 <script setup>
 import NextTrackSVG from '../../../public/NextTrackSVG.vue';
 import PlayButton from './PlayButton.vue';
+import TrackProgressBar from './TrackProgressBar.vue';
 
 const trackData = 
     {
@@ -72,18 +71,7 @@ const trackData =
     width: 350px;
 }
 
-.player-progress-bar-wrapper {
-    padding: 3px 0;
-    cursor: pointer;
-}
 
-.player-progress-bar {
-    margin-top: 10px;
-    width: 100%;
-    height: 4px;
-    background-color: rgba(255, 255, 255, 0.356);
-    border-radius: 10px;
-}
 
 .track-duration {
     font-size: 14px;

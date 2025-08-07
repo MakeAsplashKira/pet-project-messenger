@@ -6,20 +6,20 @@ import (
 	"messenger/internal/handlers"
 	"messenger/internal/handlers/music"
 	"messenger/internal/middleware"
-	"net/http"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-
+	// Загрузка .env
 	if err := godotenv.Load("data.env"); err != nil {
 		log.Fatal("Не удалось загрузить data.env: ", err)
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET не находится в .env файле!")
+		log.Fatal("JWT_SECRET не найден в .env")
 	}
 
 	db := config.InitDB()
@@ -33,48 +33,52 @@ func main() {
 		From:     "Pet-project <sanyasatana@yandex.ru>",
 	}
 
-	// Роутинг
+	// Инициализация обработчиков
 	auth := handlers.NewHandler(db, jwtSecret)
 	authEmail := handlers.NewEmailHandler(auth, smtpConfig)
 	musicHandler := music.NewMusicHandler(auth)
-	mux := http.NewServeMux()
 
-	//Авторизация
-	mux.HandleFunc("/api/check-email", authEmail.CheckEmailAvailability)
-	mux.HandleFunc("/api/send-verif-code", authEmail.SendVerificationCodeHandler)
-	mux.HandleFunc("/api/check-verif-code", authEmail.VerifyCode)
-	mux.HandleFunc("/api/check-username", auth.CheckUsernameAvailability)
-	mux.HandleFunc("/api/reg-user", auth.RegistrateNewUser)
-	mux.HandleFunc("/api/refresh-tokens", auth.RefreshTokens)
-	mux.HandleFunc("/api/login", auth.Login)
-	//Музыка
-	mux.HandleFunc("/api/upload-track", musicHandler.UploadTrackHandler)
-	mux.HandleFunc("/api/stream", musicHandler.StreamTrack)
+	// Инициализация Gin
+	router := gin.Default()
 
-	protected := http.NewServeMux()
-	protected.HandleFunc("/api/logout", auth.Logout)
+	// CORS Middleware
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	mux.Handle("/", middleware.AuthMiddleware(jwtSecret, protected))
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
 
-	handler := enableCORS(mux)
+		c.Next()
+	})
+
+	// Публичные маршруты
+	api := router.Group("/api")
+	{
+		api.POST("/check-email", authEmail.CheckEmailAvailability)
+		api.POST("/send-verif-code", authEmail.SendVerificationCodeHandler)
+		api.POST("/check-verif-code", authEmail.VerifyCode)
+		api.POST("/check-username", auth.CheckUsernameAvailability)
+		api.POST("/reg-user", auth.RegistrateNewUser)
+		api.POST("/refresh-tokens", auth.RefreshTokens)
+		api.POST("/login", auth.Login)
+
+		api.POST("/upload-track", musicHandler.UploadTrackHandler)
+		api.GET("/stream-track/:id", musicHandler.StreamTrackHandler)
+	}
+
+	// Защищённые маршруты
+	protected := api.Group("/")
+	protected.Use(middleware.AuthMiddleware(jwtSecret))
+	{
+		protected.POST("/logout", auth.Logout)
+	}
 
 	// Запуск сервера
 	log.Println("Сервер запущен на :8080")
-	log.Fatal(http.ListenAndServe(":8080", handler))
-}
-
-func enableCORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Max-Age", "3600")
-
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+	log.Fatal(router.Run(":8080"))
 }

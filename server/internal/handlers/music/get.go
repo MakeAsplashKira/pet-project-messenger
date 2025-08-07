@@ -9,70 +9,86 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
-func (h *MusicHandler) StreamTrack(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Wrong method, you should use GET", http.StatusMethodNotAllowed)
-		return
-	}
-
-	trackID := r.URL.Query().Get("id")
+func (h *MusicHandler) StreamTrackHandler(c *gin.Context) {
+	trackID := c.Param("id")
 	if trackID == "" {
-		http.Error(w, "Track ID is required", http.StatusBadRequest)
+		c.String(http.StatusBadRequest, "Track ID is required")
 		return
 	}
 
 	var filePath string
 	err := h.DB.QueryRow(context.Background(),
-		`SELECT file_path from tracks WHERE id = $1`, trackID).Scan(&filePath)
+		`SELECT file_path FROM tracks WHERE track_id = $1`, trackID).Scan(&filePath)
 	if err != nil {
-		http.Error(w, "Track not found", http.StatusNotFound)
+		c.String(http.StatusNotFound, "Track not found")
 		return
 	}
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		http.Error(w, "File not found", http.StatusNotFound)
+		c.String(http.StatusNotFound, "File not found")
 		return
 	}
 	defer file.Close()
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		http.Error(w, "File error", http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, "File error")
 		return
 	}
 
 	fileSize := fileInfo.Size()
 	contentType := "audio/mpeg"
+	rangeHeader := c.GetHeader("Range")
 
-	rangeHeader := r.Header.Get("Range")
+	var start, end int64
+
 	if rangeHeader == "" {
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
-		w.WriteHeader(http.StatusOK)
-		io.Copy(w, file)
-		return
+		// Отдаем только первые 512 КБ
+		start = 0
+		const defaultChunkSize int64 = 512 * 1024
+		end = start + defaultChunkSize - 1
+		if end >= fileSize {
+			end = fileSize - 1
+		}
+	} else {
+		// Парсим заголовок Range
+		ranges, err := parseRange(rangeHeader, fileSize)
+		if err != nil || len(ranges) == 0 {
+			c.String(http.StatusBadRequest, "Invalid Range header")
+			return
+		}
+		if len(ranges) > 1 {
+			c.String(http.StatusRequestedRangeNotSatisfiable, "Multiple ranges not supported")
+			return
+		}
+		start = ranges[0].start
+		end = ranges[0].end
+		if end >= fileSize {
+			end = fileSize - 1
+		}
 	}
 
-	ranges, err := parseRange(rangeHeader, fileSize)
+	// Позиционируемся в файле
+	_, err = file.Seek(start, io.SeekStart)
 	if err != nil {
-		http.Error(w, "Invalid Range header", http.StatusBadRequest)
+		c.String(http.StatusInternalServerError, "Seek error")
 		return
 	}
-	if len(ranges) > 1 {
-		http.Error(w, "Multiple ranges not supported", http.StatusRequestedRangeNotSatisfiable)
-		return
-	}
-	start := ranges[0].start
-	end := ranges[0].end
 
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Length", strconv.FormatInt(end-start+1, 10))
-	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileSize))
-	w.Header().Set("Accept-Ranges", "bytes")
-	w.WriteHeader(http.StatusPartialContent)
+	// Устанавливаем заголовки
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Length", strconv.FormatInt(end-start+1, 10))
+	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileSize))
+	c.Header("Accept-Ranges", "bytes")
+	c.Status(http.StatusPartialContent)
+
+	// Передаём диапазон байт
+	io.CopyN(c.Writer, file, end-start+1)
 }
 
 type httpRange struct {
@@ -88,6 +104,7 @@ func parseRange(s string, size int64) ([]httpRange, error) {
 	if !strings.HasPrefix(s, b) {
 		return nil, errors.New("invalid range")
 	}
+
 	var ranges []httpRange
 	for _, ra := range strings.Split(s[len(b):], ",") {
 		ra = strings.TrimSpace(ra)
@@ -97,34 +114,50 @@ func parseRange(s string, size int64) ([]httpRange, error) {
 
 		i := strings.Index(ra, "-")
 		if i < 0 {
-			return nil, errors.New("invalid range")
+			return nil, errors.New("invalid range format")
 		}
-		start, end := strings.TrimSpace(ra[:i]), strings.TrimSpace(ra[i+1:])
-		var r httpRange
-		if start == "" {
-			i, err := strconv.ParseInt(end, 10, 64)
-			if err != nil {
-				return nil, errors.New("invalid range")
-			}
-			r.start = i
 
-			if end == "" {
+		startStr, endStr := strings.TrimSpace(ra[:i]), strings.TrimSpace(ra[i+1:])
+		var r httpRange
+
+		if startStr == "" {
+			// Пример: bytes=-500
+			length, err := strconv.ParseInt(endStr, 10, 64)
+			if err != nil {
+				return nil, errors.New("invalid range end")
+			}
+			if length > size {
+				length = size
+			}
+			r.start = size - length
+			r.end = size - 1
+		} else {
+			// Пример: bytes=500-999
+			start, err := strconv.ParseInt(startStr, 10, 64)
+			if err != nil || start < 0 {
+				return nil, errors.New("invalid range start")
+			}
+			r.start = start
+
+			if endStr == "" {
 				r.end = size - 1
 			} else {
-				i, err := strconv.ParseInt(end, 10, 64)
-				if err != nil || r.start > i {
-					return nil, errors.New("invalid Range")
+				end, err := strconv.ParseInt(endStr, 10, 64)
+				if err != nil || end < start {
+					return nil, errors.New("invalid range end")
 				}
-				if i >= size {
-					i = size - 1
+				if end >= size {
+					end = size - 1
 				}
-				r.end = i
+				r.end = end
 			}
 		}
+
 		ranges = append(ranges, r)
 	}
+
 	if len(ranges) == 0 {
-		return nil, errors.New("invalid range")
+		return nil, errors.New("no valid ranges found")
 	}
 	return ranges, nil
 }

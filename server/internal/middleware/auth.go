@@ -1,67 +1,55 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func AuthMiddleware(jwtSecret string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 1. Пропускаем OPTIONS запросы (для CORS)
-		if r.Method == "OPTIONS" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		// 2. Проверяем наличие заголовка
-		authHeader := r.Header.Get("Authorization")
+func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			http.Error(w, "Authorization header is required", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 			return
 		}
 
-		// 3. Проверяем формат Bearer токена
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
 			return
 		}
-		tokenString := authHeader[7:]
 
-		// 4. Парсим токен с проверкой подписи
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
 		claims := &jwt.RegisteredClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
-			// Проверяем алгоритм подписи
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
 			return []byte(jwtSecret), nil
 		})
 
-		// 5. Проверяем ошибки парсинга
 		if err != nil {
-			http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: " + err.Error()})
 			return
 		}
 
-		// 6. Проверяем валидность токена
 		if !token.Valid {
-			http.Error(w, "Token is invalid", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token is invalid"})
 			return
 		}
 
-		// 7. Проверяем срок действия (если указан)
 		if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Before(time.Now()) {
-			http.Error(w, "Token expired", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
 			return
 		}
 
-		// 8. Добавляем user_id в контекст
-		ctx := context.WithValue(r.Context(), "user_id", claims.Subject)
+		// Сохраняем user_id в контексте Gin
+		c.Set("user_id", claims.Subject)
 
-		// 9. Передаем запрос дальше
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		c.Next()
+	}
 }
