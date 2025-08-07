@@ -4,6 +4,7 @@ import (
 	"log"
 	"messenger/internal/config"
 	"messenger/internal/handlers"
+	"messenger/internal/handlers/music"
 	"messenger/internal/middleware"
 	"net/http"
 	"os"
@@ -24,20 +25,34 @@ func main() {
 	db := config.InitDB()
 	defer db.Close()
 
+	smtpConfig := handlers.SMTPConfig{
+		Host:     "smtp.yandex.ru",
+		Port:     465,
+		Username: "sanyasatana@yandex.ru",
+		Password: os.Getenv("YANDEX_SMTP_PASSWORD"),
+		From:     "Pet-project <sanyasatana@yandex.ru>",
+	}
+
 	// Роутинг
-	h := handlers.NewHandler(db, jwtSecret)
+	auth := handlers.NewHandler(db, jwtSecret)
+	authEmail := handlers.NewEmailHandler(auth, smtpConfig)
+	musicHandler := music.NewMusicHandler(auth)
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/api/check-email", h.CheckEmailAvailability)
-	mux.HandleFunc("/api/check-username", h.CheckUsernameAvailability)
-	mux.HandleFunc("/api/send-verif-code", h.SendVerificationCodeHandler)
-	mux.HandleFunc("/api/check-verif-code", h.VerifyCode)
-	mux.HandleFunc("/api/reg-user", h.RegistrateNewUser)
-	mux.HandleFunc("/api/refresh-tokens", h.RefreshTokens)
-	mux.HandleFunc("/api/login", h.Login)
-	mux.HandleFunc("/api/upload-track", h.UploadTrackHandler)
+	//Авторизация
+	mux.HandleFunc("/api/check-email", authEmail.CheckEmailAvailability)
+	mux.HandleFunc("/api/send-verif-code", authEmail.SendVerificationCodeHandler)
+	mux.HandleFunc("/api/check-verif-code", authEmail.VerifyCode)
+	mux.HandleFunc("/api/check-username", auth.CheckUsernameAvailability)
+	mux.HandleFunc("/api/reg-user", auth.RegistrateNewUser)
+	mux.HandleFunc("/api/refresh-tokens", auth.RefreshTokens)
+	mux.HandleFunc("/api/login", auth.Login)
+	//Музыка
+	mux.HandleFunc("/api/upload-track", musicHandler.UploadTrackHandler)
+	mux.HandleFunc("/api/stream", musicHandler.StreamTrack)
+
 	protected := http.NewServeMux()
-	protected.HandleFunc("/api/logout", h.Logout)
+	protected.HandleFunc("/api/logout", auth.Logout)
 
 	mux.Handle("/", middleware.AuthMiddleware(jwtSecret, protected))
 

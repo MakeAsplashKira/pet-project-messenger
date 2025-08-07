@@ -17,7 +17,7 @@ func (h *Handler) CheckUsernameAvailability(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var exists bool
-	err := h.db.QueryRow(context.Background(),
+	err := h.DB.QueryRow(context.Background(),
 		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
 		req.Username,
 	).Scan(&exists)

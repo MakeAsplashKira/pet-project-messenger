@@ -60,7 +60,7 @@ func (h *Handler) RegistrateNewUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID string
-	err = h.db.QueryRow(context.Background(),
+	err = h.DB.QueryRow(context.Background(),
 		"INSERT INTO users (username, email, password_hash, created_at) VALUES ($1, $2, $3, $4) RETURNING user_id",
 		req.Username, req.Email, string(hashedPassword), time.Now(),
 	).Scan(&userID)
@@ -75,7 +75,7 @@ func (h *Handler) RegistrateNewUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.db.Exec(context.Background(),
+	_, err = h.DB.Exec(context.Background(),
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		userID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
 	if err != nil {
@@ -109,7 +109,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var user User
-	err := h.db.QueryRow(context.Background(),
+	err := h.DB.QueryRow(context.Background(),
 		"SELECT user_id, email, password_hash from users WHERE email = $1",
 		req.Email,
 	).Scan(&user.ID, &user.Username, &user.Password)
@@ -131,7 +131,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.db.Exec(context.Background(),
+	_, err = h.DB.Exec(context.Background(),
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		user.ID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
 	if err != nil {
@@ -160,7 +160,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	refreshCookies, err := r.Cookie("refresh_token")
 	if err == nil {
-		_, _ = h.db.Exec(context.Background(),
+		_, _ = h.DB.Exec(context.Background(),
 			`DELETE FROM refresh_tokens WHERE token_hash = $1`,
 			hashToken(refreshCookies.Value))
 	}
@@ -229,7 +229,7 @@ func (h *Handler) RefreshTokens(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID string
-	err = h.db.QueryRow(context.Background(),
+	err = h.DB.QueryRow(context.Background(),
 		`DELETE FROM refresh_tokens WHERE token_hash = $1 RETURNING user_id`, hashToken(cookie.Value)).Scan(&userID)
 	if err != nil {
 		http.Error(w, "Неверный refresh токен", http.StatusUnauthorized)
@@ -242,7 +242,7 @@ func (h *Handler) RefreshTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.db.Exec(context.Background(),
+	_, err = h.DB.Exec(context.Background(),
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		userID, hashToken(tokens.RefreshToken), time.Now().Add(refreshTokenExp))
 	if err != nil {

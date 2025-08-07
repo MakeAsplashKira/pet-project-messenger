@@ -10,18 +10,15 @@ import (
 	"log"
 	"net/http"
 	"net/smtp"
-	"os"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Handler struct {
-	db         *pgxpool.Pool
+type EmailHandler struct {
+	*Handler
 	smtpConfig SMTPConfig
-	jwtSecret  string
 }
+
 type SMTPConfig struct {
 	Host     string
 	Port     int
@@ -30,17 +27,10 @@ type SMTPConfig struct {
 	From     string
 }
 
-func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
-	return &Handler{
-		db: db,
-		smtpConfig: SMTPConfig{
-			Host:     "smtp.yandex.ru",
-			Port:     465,
-			Username: "sanyasatana@yandex.ru",
-			Password: os.Getenv("YANDEX_SMTP_PASSWORD"),
-			From:     "Pet-project <sanyasatana@yandex.ru>",
-		},
-		jwtSecret: jwtSecret,
+func NewEmailHandler(h *Handler, smtpConfig SMTPConfig) *EmailHandler {
+	return &EmailHandler{
+		Handler:    h,
+		smtpConfig: smtpConfig,
 	}
 }
 
@@ -60,14 +50,14 @@ type VerificationCode struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-func (h *Handler) CheckEmailAvailability(w http.ResponseWriter, r *http.Request) {
+func (h *EmailHandler) CheckEmailAvailability(w http.ResponseWriter, r *http.Request) {
 	var req EmailCheckRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
 		return
 	}
 	var exists bool
-	err := h.db.QueryRow(context.Background(),
+	err := h.DB.QueryRow(context.Background(),
 		"SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)",
 		strings.ToLower(req.Email),
 	).Scan(&exists)
@@ -97,7 +87,7 @@ func generateRandomCode() (string, error) {
 	return fmt.Sprintf("%06d", n%1000000), nil
 }
 
-func (h *Handler) SendVerificationCodeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *EmailHandler) SendVerificationCodeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -121,14 +111,14 @@ func (h *Handler) SendVerificationCodeHandler(w http.ResponseWriter, r *http.Req
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err = h.db.Exec(ctx,
+	_, err = h.DB.Exec(ctx,
 		"DELETE FROM verification_codes WHERE email = $1",
 		req.Email)
 	if err != nil {
 		http.Error(w, "Failed to delete old codes", http.StatusInternalServerError)
 		return
 	}
-	_, err = h.db.Exec(ctx,
+	_, err = h.DB.Exec(ctx,
 		"INSERT INTO verification_codes (email, code, created_at, expires_at) VALUES ($1, $2, $3, $4)",
 		req.Email, code, createdAt, expiresAt,
 	)
@@ -137,21 +127,21 @@ func (h *Handler) SendVerificationCodeHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// subject := "Код подтверждения для MediaVerse"
-	// body := fmt.Sprintf(`
-	//     Здравствуйте!
+	subject := "Код подтверждения для MediaVerse"
+	body := fmt.Sprintf(`
+	    Здравствуйте!
 
-	//     Ваш код подтверждения: %s
-	//     Действителен до: %s
+	    Ваш код подтверждения: %s
+	    Действителен до: %s
 
-	//     Никому не сообщайте этот код!`,
-	// 	code, expiresAt.Format("15:04 02.01.2006"))
+	    Никому не сообщайте этот код!`,
+		code, expiresAt.Format("15:04 02.01.2006"))
 
-	// if err := h.sendEmail(req.Email, subject, body); err != nil {
-	// 	log.Println("Ошибка отправки  E-mail! ", err)
-	// 	http.Error(w, "Не удалось отправить код", http.StatusInternalServerError)
-	// 	return
-	// }
+	if err := h.sendEmail(req.Email, subject, body); err != nil {
+		log.Println("Ошибка отправки  E-mail! ", err)
+		http.Error(w, "Не удалось отправить код", http.StatusInternalServerError)
+		return
+	}
 	fmt.Printf("Вот твой код бро: %v для E-mail: %v\n", code, req.Email)
 
 	respondJSON(w, http.StatusOK, map[string]string{
@@ -160,7 +150,7 @@ func (h *Handler) SendVerificationCodeHandler(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (h *Handler) sendEmail(to, subject, body string) error {
+func (h *EmailHandler) sendEmail(to, subject, body string) error {
 	// 1. Формируем письмо
 	msg := fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
@@ -223,7 +213,7 @@ func (h *Handler) sendEmail(to, subject, body string) error {
 	return client.Quit()
 }
 
-func (h *Handler) VerifyCode(w http.ResponseWriter, r *http.Request) {
+func (h *EmailHandler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -243,7 +233,7 @@ func (h *Handler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt time.Time
 	}
 
-	err := h.db.QueryRow(ctx,
+	err := h.DB.QueryRow(ctx,
 		`SELECT code, expires_at FROM verification_codes 
 		WHERE email = $1 AND expires_at > NOW() 
 		ORDER BY created_at DESC LIMIT 1`,
@@ -265,7 +255,7 @@ func (h *Handler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Если код верный, помечаем email как подтвержденный
-	_, err = h.db.Exec(ctx,
+	_, err = h.DB.Exec(ctx,
 		"UPDATE verification_codes SET is_used = true WHERE email = $1 AND code = $2",
 		req.Email, req.Code,
 	)
