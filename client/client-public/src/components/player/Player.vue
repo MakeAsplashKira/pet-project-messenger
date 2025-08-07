@@ -3,7 +3,7 @@
     <div class="player-controlls">
         <NextTrackSVG class="fliped-svg"/>
         <PlayButton/>
-        <NextTrackSVG/>
+        <NextTrackSVG class="player-svg"/>
     </div>
     <div class="player-content">
         <div class="player-main">
@@ -121,13 +121,17 @@ const trackData =
     height: 40px;
 }
 
-.fliped-svg {
-    transform: rotate(180deg);
-}
-
 .player-controlls {
     display: flex;
     gap: 5px;
     align-items: center;
 }
+
+.fliped-svg {
+    transform: rotate(180deg);
+}
+.fliped-svg:hover {
+    transform: rotate(180deg) scale(1.05) translateY(-1px);
+}
+
 </style>

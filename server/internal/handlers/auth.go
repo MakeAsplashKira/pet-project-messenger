@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	accessTokenEXP  = 15 * time.Minute
-	refreshTokenExp = 7 * 24 * time.Hour
+	accessTokenEXP  = 15 * time.Minute   //15 Минут
+	refreshTokenExp = 7 * 24 * time.Hour //1 Неделя
 )
 
 var revokedTokens sync.Map

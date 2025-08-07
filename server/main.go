@@ -35,7 +35,7 @@ func main() {
 	mux.HandleFunc("/api/reg-user", h.RegistrateNewUser)
 	mux.HandleFunc("/api/refresh-tokens", h.RefreshTokens)
 	mux.HandleFunc("/api/login", h.Login)
-
+	mux.HandleFunc("/api/upload-track", h.UploadTrackHandler)
 	protected := http.NewServeMux()
 	protected.HandleFunc("/api/logout", h.Logout)
 

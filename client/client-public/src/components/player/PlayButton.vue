@@ -61,8 +61,8 @@ function hideCircleSeq() {
 <style scoped>
 .play-btn-wrapper {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   cursor: pointer;
 }
 
@@ -75,12 +75,19 @@ function hideCircleSeq() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 1);
+  background-color: rgba(255, 255, 255, .7);
   width: 40px;
   height: 40px;
   text-align: center;
   color: black;
-  z-index: 2;
+  z-index: 5;
+  transition: all .3s ease-in-out;
+}
+
+.play-btn:hover {
+    transform: translate(-50%, -50%) scale(1.05);
+   background-color: rgba(255, 255, 255, 1);
+    
 }
 
 .play-btn-anim {
@@ -101,7 +108,7 @@ function hideCircleSeq() {
   height: 10px;
   box-shadow: 3px 3px 6px black;
   border-radius: 50%;
-  background-color: rgb(255, 255, 255);
+  background-color: rgb(255, 255, 255, .7);
   opacity: 0;
   transform: scale(0.3);
   transition: all .5s ease-in-out;

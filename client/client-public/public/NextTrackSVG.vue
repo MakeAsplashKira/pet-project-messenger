@@ -3,3 +3,15 @@
 </template>
 
 
+<style scoped>
+svg {
+    transition: all .3s ease;
+    opacity: .7;
+}
+
+svg:hover {
+    transform: scale(1.05);
+    opacity: 1;
+}
+
+</style>
