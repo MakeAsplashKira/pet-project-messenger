@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"net/smtp"
 	"strings"
 	"time"
@@ -118,21 +117,21 @@ func (h *EmailHandler) SendVerificationCodeHandler(c *gin.Context) {
 		return
 	}
 
-	subject := "Код подтверждения для MediaVerse"
-	body := fmt.Sprintf(`
-	Здравствуйте!
+	// subject := "Код подтверждения для MediaVerse"
+	// body := fmt.Sprintf(`
+	// Здравствуйте!
 
-	Ваш код подтверждения: %s
-	Действителен до: %s
+	// Ваш код подтверждения: %s
+	// Действителен до: %s
 
-	Никому не сообщайте этот код!`,
-		code, expiresAt.Format("15:04 02.01.2006"))
+	// Никому не сообщайте этот код!`,
+	// 	code, expiresAt.Format("15:04 02.01.2006"))
 
-	if err := h.sendEmail(req.Email, subject, body); err != nil {
-		log.Println("Ошибка отправки E-mail: ", err)
-		c.JSON(500, gin.H{"error": "Не удалось отправить код"})
-		return
-	}
+	// if err := h.sendEmail(req.Email, subject, body); err != nil {
+	// 	log.Println("Ошибка отправки E-mail: ", err)
+	// 	c.JSON(500, gin.H{"error": "Не удалось отправить код"})
+	// 	return
+	// }
 
 	fmt.Printf("Вот твой код бро: %v для E-mail: %v\n", code, req.Email)
 
@@ -154,13 +153,13 @@ func (h *EmailHandler) sendEmail(to, subject, body string) error {
 
 	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", h.smtpConfig.Host, h.smtpConfig.Port), tlsConfig)
 	if err != nil {
-		return fmt.Errorf("Ошибка подключения: %v", err)
+		return fmt.Errorf("ошибка подключения: %v", err)
 	}
 	defer conn.Close()
 
 	client, err := smtp.NewClient(conn, h.smtpConfig.Host)
 	if err != nil {
-		return fmt.Errorf("Ошибка SMTP-клиента: %v", err)
+		return fmt.Errorf("ошибка SMTP-клиента: %v", err)
 	}
 	defer client.Close()
 
@@ -170,25 +169,25 @@ func (h *EmailHandler) sendEmail(to, subject, body string) error {
 		h.smtpConfig.Password,
 		h.smtpConfig.Host,
 	)); err != nil {
-		return fmt.Errorf("Ошибка аутентификации: %v", err)
+		return fmt.Errorf("ошибка аутентификации: %v", err)
 	}
 
 	if err = client.Mail(h.smtpConfig.Username); err != nil {
-		return fmt.Errorf("Ошибка отправителя: %v", err)
+		return fmt.Errorf("ошибка отправителя: %v", err)
 	}
 	if err = client.Rcpt(to); err != nil {
-		return fmt.Errorf("Ошибка получателя: %v", err)
+		return fmt.Errorf("ошибка получателя: %v", err)
 	}
 
 	w, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("Ошибка данных: %v", err)
+		return fmt.Errorf("ошибка данных: %v", err)
 	}
 	if _, err = w.Write([]byte(msg)); err != nil {
-		return fmt.Errorf("Ошибка записи: %v", err)
+		return fmt.Errorf("ошибка записи: %v", err)
 	}
 	if err = w.Close(); err != nil {
-		return fmt.Errorf("Ошибка закрытия: %v", err)
+		return fmt.Errorf("ошибка закрытия: %v", err)
 	}
 
 	return client.Quit()

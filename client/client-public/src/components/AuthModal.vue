@@ -138,7 +138,9 @@
 
       <!-- Шаг 2: Код подтверждения -->
       <div v-show="regStep === 2 && AuthType=='register'" class="auth-step">
-        <h3>Введите код из письма</h3>
+        <div class="auth-content-header">Заполним профиль!</div>
+        <AvatarEditor/>
+         
       </div>
 
       <!-- Шаг 3: Профиль -->
@@ -150,7 +152,7 @@
     <div class="auth-modal__steps" :class="{'hide-modal__steps': AuthType != 'register'}">
         <div class="auth-steps-left">
    
-            <div class="auth-step-anim" v-for="step in registrationSteps">
+            <div class="auth-step-anim"  v-for="(step, index) in registrationSteps" :key="index">
               <LiquidProgress :text="step.text" :fillPercent="step.fillPercent" :cSize="step.cSize" :current-stage="step.currentStage"/>
             </div>
         </div>
@@ -160,19 +162,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, onUnmounted, watchEffect} from 'vue';
+import { ref, onMounted, watch, computed, onUnmounted, watchEffect, nextTick} from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import lottie from 'lottie-web';
 import LiquidProgress from './anim/LiquidProgress.vue';
 import useNotify from '@/composable/useNotify';
 import { checkEmailOnServer, checkUsername, registerUser, sendVerificationCodeOnServer, VerifyCodeOnServer } from '@/api.js';
-
-
-
+import AvatarEditor from './AvatarEditor.vue';
 const {notify} = useNotify()
 
+
+
+
+
 const lottieContainer = ref(null)
-const regStep = ref(1)
+const regStep = ref(2)
 
 onMounted(async () => {
   const animationData = await import('@/assets/auth-anim.json');
@@ -207,12 +211,24 @@ const completeLogin = async() => {
 
 
 
+
+
+
 const registrationSteps = ref([
-  {text:'1',fillPercent: 0, cSize: 70, currentStage: true},
-  {text:'2',fillPercent: 0, cSize: 80, currentStage: false},
-  {text:'3',fillPercent: 0, cSize: 90, currentStage: false},
-  {text:'Готово!',fillPercent: 0, cSize: 100, currentStage: false},  
+  {text:'1',fillPercent: -1, cSize: 70, currentStage: true},
+  {text:'2',fillPercent: -1, cSize: 80, currentStage: false},
+  {text:'3',fillPercent: -1, cSize: 90, currentStage: false},
+  {text:'Готово!',fillPercent: -1, cSize: 100, currentStage: false},  
 ])
+
+watch(regStep, async () => {
+  await nextTick()
+
+  const elements = document.querySelectorAll('.auth-step-anim')
+  if(elements && regStep.value >=2) {
+    elements[regStep.value - 2].classList.add('step-anim')
+  }
+})
 
 
 const AuthType = ref('choose')
@@ -233,11 +249,6 @@ const ChangeAuthType = (type) => {
   }, 600)
   }
 }
-
-
-
-
-
 
 const goToNextStep=()=> {
   if(bottomButtonActive) {
@@ -603,12 +614,16 @@ const closeAuthModal = () => {
 }
 
 onUnmounted(()=> {
+  if(cropper) cropper.destroy()
   clearTimeout(timeoutPassword)
   clearTimeout(timeoutPasswordR)
 })
 
 </script>
 <style scoped>
+
+
+
 
 .content-choose-buttons {
   position: absolute;
@@ -678,6 +693,8 @@ onUnmounted(()=> {
   cursor: pointer;
   transition: all .2s ease-in-out;
 }
+
+
 
 .servise:hover {
   opacity: .9;
@@ -820,10 +837,6 @@ onUnmounted(()=> {
   border-radius: 8px;
 }
 
-.auth-loading {
-}
-
-
 .auth-content-1 {
   height: 100%;
 }
@@ -903,7 +916,6 @@ onUnmounted(()=> {
     user-select: none;
     box-shadow: 2px 2px 8px black;
 }
-
 .auth-step-anim::after {
     position: absolute;
     content: "";
@@ -913,14 +925,34 @@ onUnmounted(()=> {
     background-color: #17212b;
     box-shadow: 2px 3px 2px rgba(0, 0, 0, 0.61);
 }
-
+.auth-step-anim::before {
+  content: "";
+  position: absolute;
+  background-color: #02d61b;
+  right: -30px;
+  width: 31px;
+  height: 10px;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.step-anim::before {
+  opacity: 1;
+  animation: filler 1s ease-in-out .2s forwards;
+}
+.auth-step-anim:last-child::before{
+  content: none;
+}
 .auth-step-anim:last-child::after {
     content: none;
 }
-
-
-
-
+@keyframes filler {
+  from {transform: scaleX(0);}
+  to {transform: scaleX(1)}
+}
 
 .input-container {
   display: flex;
