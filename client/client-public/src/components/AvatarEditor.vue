@@ -52,8 +52,9 @@ import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import AvatarUploadSVG from '../../public/AvatarUploadSVG.vue'
 import UploadAvatarOnDrag from '../../public/UploadAvatarOnDrag.vue'
 import useNotify from '@/composable/useNotify'
+import { useRegAuth } from '@/stores/regAuth'
 const {notify} = useNotify()
-
+const regAuth = useRegAuth()
 
 let MIN_SCALE = 0.5
 const MAX_SCALE = 2

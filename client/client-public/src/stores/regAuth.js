@@ -21,5 +21,5 @@ export const useRegAuth = defineStore('regAuth', {
         setUsername(username) {
             this.username = username
         }
-    }
+    } 
 })

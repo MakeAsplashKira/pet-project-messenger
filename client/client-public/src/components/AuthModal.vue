@@ -50,7 +50,7 @@
             </div>
           </div>
         </div>
-      <div v-if="regStep === 1 && AuthType=='register'" class="auth-step" >
+      <div v-if="regAuth.currentStep === 1 && AuthType=='register'" class="auth-step" >
         <div class="auth-header-1" v-if="AuthType=='register'">
            Давайте зарегестрируем вас!
         </div>
@@ -137,14 +137,14 @@
         </div>
 
       <!-- Шаг 2: Код подтверждения -->
-      <div v-show="regStep === 2 && AuthType=='register'" class="auth-step">
+      <div v-show="regAuth.currentStep === 2 && AuthType=='register'" class="auth-step">
         <div class="auth-content-header">Заполним профиль 👀</div>
         <AvatarEditor/>
          
       </div>
 
       <!-- Шаг 3: Профиль -->
-      <div v-show="regStep === 3 && AuthType=='register'" class="auth-step">
+      <div v-show="regAuth.currentStep === 3 && AuthType=='register'" class="auth-step">
         <h3>Создайте профиль</h3>
         
       </div>
@@ -169,14 +169,14 @@ import LiquidProgress from './anim/LiquidProgress.vue';
 import useNotify from '@/composable/useNotify';
 import { checkEmailOnServer, checkUsername, registerUser, sendVerificationCodeOnServer, VerifyCodeOnServer } from '@/api.js';
 import AvatarEditor from './AvatarEditor.vue';
+import { useRegAuth } from '@/stores/regAuth';
 const {notify} = useNotify()
-
+const regAuth = useRegAuth()
 
 
 
 
 const lottieContainer = ref(null)
-const regStep = ref(2)
 
 onMounted(async () => {
   const animationData = await import('@/assets/auth-anim.json');
@@ -221,12 +221,14 @@ const registrationSteps = ref([
   {text:'Готово!',fillPercent: -1, cSize: 100, currentStage: false},  
 ])
 
-watch(regStep, async () => {
+watch(() => regAuth.currentStep,
+async (newStep) =>
+ {
   await nextTick()
 
   const elements = document.querySelectorAll('.auth-step-anim')
-  if(elements && regStep.value >=2) {
-    elements[regStep.value - 2].classList.add('step-anim')
+  if(elements && newStep >=2) {
+    elements[newStep - 2].classList.add('step-anim')
   }
 })
 
@@ -253,20 +255,20 @@ const ChangeAuthType = (type) => {
 const goToNextStep=()=> {
   if(bottomButtonActive) {
     updateCurrentStepFillPercentToMax()
-    regStep.value+=1
-    registrationSteps.value[regStep.value-1].currentStage = true
+    regAuth.currentStep+=1
+    registrationSteps.value[regAuth.currentStep-1].currentStage = true
   }
 }
 
 const updateCurrentStepFillPercent = (value) => {
-  if (value < 0 && registrationSteps.value[regStep.value-1].fillPercent == 0) {
-    registrationSteps.value[regStep.value-1].fillPercent = 0
+  if (value < 0 && registrationSteps.value[regAuth.currentStep-1].fillPercent == 0) {
+    registrationSteps.value[regAuth.currentStep-1].fillPercent = 0
     return
   }
-  registrationSteps.value[regStep.value-1].fillPercent += value
+  registrationSteps.value[regAuth.currentStep-1].fillPercent += value
 }
 const updateCurrentStepFillPercentToMax = () => {
-  registrationSteps.value[regStep.value-1].fillPercent = 110
+  registrationSteps.value[regAuth.currentStep-1].fillPercent = 110
 }
 
 const password = ref('')
@@ -586,7 +588,7 @@ const validateEmail = async  () => {
 const completeRegistration = async () => {
   if (!bottomButtonActive.value) return
   
-  if (regStep.value == 1) {
+  if (regAuth.currentStep == 1) {
     try {
       const authStore = useAuthStore()
 
