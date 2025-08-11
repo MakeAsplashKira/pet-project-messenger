@@ -75,7 +75,7 @@ export default {
 }
 
 .notification-info {
-  background-color: #2196F3;
+  background-color: #f59e42;
 }
 
 .notification-success {
@@ -147,12 +147,12 @@ export default {
   word-break: break-all;
   line-height: 18px;
   display: -webkit-box;
-  -webkit-line-clamp: 3;       /* Ограничиваем 2 строками */
+  -webkit-line-clamp: 5;       /* Ограничиваем 3 строками */
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;            /* Важно для корректного подсчёта строк */
-  max-height: calc(3em * 1.3); /* 2 строки с учётом line-height */
+  max-height: calc(5em * 1.3); /* 2 строки с учётом line-height */
 }
 
 .notification-close {

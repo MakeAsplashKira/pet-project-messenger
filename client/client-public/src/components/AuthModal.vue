@@ -10,7 +10,7 @@
           </div>
         </div>
         <div class="auth-content-login" v-if="AuthType=='login'">
-          <div class="auth-content-header">Продолжим?</div>
+          <div class="auth-content-header">Продолжим 👑</div>
           <div class="login-content">
             <div class="input-container login">
               <div class="input-icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="#ffffff" d="M28 6H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2m-2.2 2L16 14.78L6.2 8ZM4 24V8.91l11.43 7.91a1 1 0 0 0 1.14 0L28 8.91V24Z"/></svg></div>
@@ -138,7 +138,7 @@
 
       <!-- Шаг 2: Код подтверждения -->
       <div v-show="regStep === 2 && AuthType=='register'" class="auth-step">
-        <div class="auth-content-header">Заполним профиль!</div>
+        <div class="auth-content-header">Заполним профиль 👀</div>
         <AvatarEditor/>
          
       </div>
@@ -201,11 +201,11 @@ const completeLogin = async() => {
       })
     }
     catch(error) {
-
+      notify.error('Авторизация', error)
     }
   }
   else {
-    notify.warning('Неудача', 'Поля должны быть заполнены...')
+    notify.warning('Авторизация', 'Поля должны быть заполнены...')
   }
 }
 
@@ -596,7 +596,7 @@ const completeRegistration = async () => {
         password: password.value
       })
       if (data?.success) {
-        notify.success('Регистрация прошла успешно!')
+        notify.success('Авторизация', 'Вы успешно зарегестрировались!')
         closeAuthModal()
       } else {
         notify.error(data.error || "Ошибка регистрации")
@@ -614,7 +614,6 @@ const closeAuthModal = () => {
 }
 
 onUnmounted(()=> {
-  if(cropper) cropper.destroy()
   clearTimeout(timeoutPassword)
   clearTimeout(timeoutPasswordR)
 })

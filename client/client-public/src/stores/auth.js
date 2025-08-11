@@ -75,13 +75,10 @@ const register = async (userData) => {
       setAuth(data.access_token);
       user.value = data.user;
       closeAuthModal();
-      notify.success('Успех', 'Вы успешно вошли в аккаунт')
+      notify.success('Авторизация', 'Вы успешно вошли в аккаунт')
       return { success: true };
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.message || 'Login failed'
-      };
+      notify.error('Авторизация', error.response?.data?.error || 'Ошибка авторизации')
     }
   };
   
