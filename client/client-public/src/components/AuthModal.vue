@@ -130,23 +130,47 @@
             </div>         
           </div>
           <div class="bottom-side">
-            <div class="skip-steps-button" :class="{'disabled-btm-btn' : !bottomButtonActive}" @click="completeRegistration">Законить регистрацию</div>
-            <div class="next-step-button" :class="{'disabled-btm-btn' : !bottomButtonActive}" @click="goToNextStep">Следующий шаг</div>
+            <div class="skip-steps-button" :class="{'disabled-btm-btn' : !firstStepReady}" @click="completeRegistration">Законить регистрацию</div>
+            <div class="next-step-button" :class="{'disabled-btm-btn' : !firstStepReady}" @click="goToNextStep">Следующий шаг</div>
           </div>
         </div>
         </div>
 
-      <!-- Шаг 2: Код подтверждения -->
+      <!-- Шаг 2 -->
       <div v-show="regAuth.currentStep === 2 && AuthType=='register'" class="auth-step">
-        <div class="auth-content-header">Заполним профиль 👀</div>
+        <div class="auth-content-header second-step-header">Заполним профиль 👀</div>
         <AvatarEditor/>
-         
+         <div class="input-container">
+          <input type="text" placeholder="Имя" v-model="firstName">
+          <div class="input-status">
+            <LoadingSVG v-if="nameState.fName == 0" />
+            <AuthSuccessSVG v-if="nameState.fName == 1"/>
+            <AuthFailedSVG v-if="nameState.fName == -1"/>
+          </div>
+         </div>
+         <div class="input-container">
+          <input type="text" placeholder="Фамилия" v-model="lastName">
+          <div class="input-status">
+            <LoadingSVG v-if="nameState.lName == 0" />
+            <AuthSuccessSVG v-if="nameState.lName == 1"/>
+            <AuthFailedSVG v-if="nameState.lName == -1"/>
+          </div>
+         </div>
+         <div class="second-step-controls">
+            <div class="second-step-btn" :class="{'active':secondStepReady}">Завершить регистрацию</div>
+            <div @click="goToNextStep()" class="second-step-btn" :class="{'active':secondStepReady}">Следующий шаг</div>
+         </div>
       </div>
 
-      <!-- Шаг 3: Профиль -->
+      <!-- Шаг 3 -->
       <div v-show="regAuth.currentStep === 3 && AuthType=='register'" class="auth-step">
-        <h3>Создайте профиль</h3>
-        
+        <div class="auth-content-header third-step-header">Почти готово!🔥</div>
+        <div class="input-container">
+          <input type="text" placeholder="Страна">
+        </div>
+        <div class="input-container">
+          <input type="text" placeholder="Город">
+        </div>
       </div>
     </div>
     <div class="auth-modal__steps" :class="{'hide-modal__steps': AuthType != 'register'}">
@@ -162,7 +186,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, onUnmounted, watchEffect, nextTick} from 'vue';
+import { ref, onMounted, watch, computed, onUnmounted, watchEffect, nextTick, reactive} from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import lottie from 'lottie-web';
 import LiquidProgress from './anim/LiquidProgress.vue';
@@ -170,6 +194,9 @@ import useNotify from '@/composable/useNotify';
 import { checkEmailOnServer, checkUsername, registerUser, sendVerificationCodeOnServer, VerifyCodeOnServer } from '@/api.js';
 import AvatarEditor from './AvatarEditor.vue';
 import { useRegAuth } from '@/stores/regAuth';
+import LoadingSVG from '../../public/LoadingSVG.vue';
+import AuthSuccessSVG from '../../public/AuthSuccessSVG.vue';
+import AuthFailedSVG from '../../public/AuthFailedSVG.vue';
 const {notify} = useNotify()
 const regAuth = useRegAuth()
 
@@ -209,10 +236,7 @@ const completeLogin = async() => {
   }
 }
 
-
-
-
-
+const VALIDATION_DELAY = 500
 
 const registrationSteps = ref([
   {text:'1',fillPercent: -1, cSize: 70, currentStage: true},
@@ -253,10 +277,44 @@ const ChangeAuthType = (type) => {
 }
 
 const goToNextStep=()=> {
-  if(bottomButtonActive) {
-    updateCurrentStepFillPercentToMax()
-    regAuth.currentStep+=1
-    registrationSteps.value[regAuth.currentStep-1].currentStage = true
+  if(regAuth.currentStep == 1) {
+    if(firstStepReady) {
+      // 1. Заполняем полностью круг из LiquidProgress.vue
+        updateCurrentStepFillPercentToMax()
+
+        // 2. Увеличиваем счетчик currentStep в pinia
+        regAuth.currentStep+=1
+        registrationSteps.value[regAuth.currentStep-1].currentStage = true
+
+        // 3. Заполняем немного круг из LiquidProgress.vue для лучшего UX
+        setTimeout(()=> {
+          updateCurrentStepFillPercent(10)
+        }, 1000)
+
+        // 4. Заносим данные в pinia store
+        regAuth.setEmail(email.value)
+        regAuth.setPassword(password.value)
+        regAuth.setUsername(username.value)
+      }
+  }
+  if (regAuth.currentStep == 2 && secondStepReady) {
+      // 1. Заполняем полностью круг из LiquidProgress.vue
+      updateCurrentStepFillPercentToMax()
+      
+      // 2. Увеличиваем счетчик currentStep в pinia
+      regAuth.currentStep+=1
+      registrationSteps.value[regAuth.currentStep-1].currentStage = true
+
+      // 3. Заполняем немного круг из LiquidProgress.vue для лучшего UX
+      setTimeout(()=> {
+        updateCurrentStepFillPercent(10)
+      }, 1000)
+      // 4. Заносим данные в pinia store
+      regAuth.setFirstName(firstName.value)
+      regAuth.setLastName(lastName.value)
+  }
+  if(regAuth.currentStep == 3) {
+    console.log('Переходим на следущий шаг')
   }
 }
 
@@ -288,7 +346,7 @@ watch(passwordR, ()=> {
   timeoutPasswordR = setTimeout(()=> {
     isTypingR.value = false
     validatePasswordR()
-  }, 1000)
+  }, VALIDATION_DELAY)
 })
 
 
@@ -322,7 +380,7 @@ watch(password, ()=> {
     if (passwordR.value.length>0) {
       validatePasswordR()
     }
-  }, 1000)
+  }, VALIDATION_DELAY)
 })
 
 const validatePassword = () => {
@@ -343,7 +401,7 @@ const validatePassword = () => {
 const isUNValid = ref(false)
 const isUNvalidByServer = ref(false)
 const emailAuthDone = ref(false)
-const bottomButtonActive = ref(false)
+const firstStepReady = ref(false)
 
 
 watchEffect(() => {
@@ -356,7 +414,7 @@ watchEffect(() => {
     isUNvalidByServer.value
   ]
   
-  bottomButtonActive.value = conditions.every(Boolean)
+  firstStepReady.value = conditions.every(Boolean)
 })
 
 const passwordStrength = computed(() => {
@@ -429,7 +487,7 @@ watch(username, async ()=> {
     if (isUNValid.value) {
       validateUNonServer(username.value)
     } else {isUNvalidByServer.value = false}
-  }, 1000)
+  }, VALIDATION_DELAY)
 }) 
 
 const validateUNonServer = async(username) => {
@@ -586,7 +644,7 @@ const validateEmail = async  () => {
 }
 
 const completeRegistration = async () => {
-  if (!bottomButtonActive.value) return
+  if (!firstStepReady.value) return
   
   if (regAuth.currentStep == 1) {
     try {
@@ -610,6 +668,95 @@ const completeRegistration = async () => {
     }
   } 
 };
+
+let avatarChanged = false
+watch(()=> regAuth.avatarImage,
+(newVal)=> {
+  if (regAuth.avatarImage == null && avatarChanged) {
+    updateCurrentStepFillPercent(-30)
+    avatarChanged = false
+  }
+  else if(!avatarChanged){
+    updateCurrentStepFillPercent(30)
+    avatarChanged = true
+  }
+})
+
+const firstName = ref('')
+const lastName = ref('')
+const nameState = reactive({
+  fName: null,
+  lName: null,
+  fNameChanged: false,
+  lNameChanged: false
+})
+
+let fNameTimeout = null
+
+watch(firstName, (name) =>{
+  clearTimeout(fNameTimeout)
+
+  if(!name) return
+
+  nameState.fName = 0 //Анимация загрузки
+  fNameTimeout = setTimeout(()=> {
+    const isValid = validateName(name)
+    if(isValid && !nameState.fNameChanged) {
+        updateCurrentStepFillPercent(30)
+        nameState.fNameChanged = true
+    }
+    else if(!isValid && nameState.fNameChanged){
+        updateCurrentStepFillPercent(-30)
+        nameState.fNameChanged = false
+    }
+      nameState.fName = isValid? 1 : -1
+    }, VALIDATION_DELAY)
+})
+
+let lNameTimeout = null
+
+watch(lastName, (name) => {
+  clearTimeout(lNameTimeout)
+
+  if(!name) return
+
+    nameState.lName = 0 //Анимация загрузки
+    lNameTimeout = setTimeout(()=>{
+      const isValid = validateName(name, true)
+      if(isValid && !nameState.lNameChanged) {
+          updateCurrentStepFillPercent(30)
+          nameState.lNameChanged = true
+      }
+      else if(!isValid && nameState.lNameChanged){
+          updateCurrentStepFillPercent(-30)
+          nameState.lNameChanged = false
+      }
+      nameState.lName = isValid? 1 : -1
+    }, VALIDATION_DELAY)
+})
+
+function validateName (name, isLastName = false) {
+    if(!name || name.trim() === '') return false
+    const maxLength = isLastName? 50:30
+    const regex = /^[A-Za-zA-Яа-яЁё\s'-]+$/u
+    if(name.length<2) {notify.warning('Авторизация', 'Слишком короткое имя | фамилия.'); return false}
+    if(name.length>maxLength) {notify.warning('Авторизация', `Максимум - ${maxLength} символов`); return false}
+    if(!regex.test(name)) {notify.warning('Авторизация', 'Недопустимые символы.'); return false}
+    if (/(\s-|-\s|'{2}|-{2}|\s{2})/.test(name)) {notify.warning('Авторизация', 'Некорректный формат'); return false}
+    return true; //Успешная валидация, возвращаем true
+}
+const secondStepReady = ref(false) 
+
+watchEffect(() => {
+  // Явно обращаемся ко всем зависимостям
+  const conditions = [
+    validateName(firstName.value),
+    validateName(lastName.value, true),
+    regAuth.originalImage,
+    regAuth.avatarImage
+  ]
+  secondStepReady.value = conditions.every(Boolean)
+})
 
 const closeAuthModal = () => {
   auth.authModalOpen = false;
@@ -759,6 +906,10 @@ onUnmounted(()=> {
   height: 80px;
   box-shadow: 0px 4px 8px black;
   background-color: #0e1621;
+}
+
+.third-step-header {
+  font-size: 26px;
 }
 
 .loading-auth-header {
@@ -1388,5 +1539,43 @@ onUnmounted(()=> {
   width: 32px;
   height: 32px;
 }
+
+.second-step-header {
+  height: 60px;
+  font-size: 24px;
+}
+
+.second-step-controls {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.second-step-btn {
+  background-color: #0e1621;
+  box-shadow: 3px 3px 6px black;
+  border-radius: 8px;
+  padding: 10px;
+  text-wrap: nowrap;
+  font-size: 16px;
+  user-select: none;
+  transition:  all .3s ease-in-out;
+  cursor: pointer;
+  cursor: not-allowed;
+  color: rgba(255, 255, 255, 0.5);
+}
+.second-step-btn.active {
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+.second-step-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow: 3px 5px 6px black;
+}
+
+
 
 </style>

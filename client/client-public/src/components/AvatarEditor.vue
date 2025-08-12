@@ -37,18 +37,10 @@
       </div>
     </div>
   </div>
-  <div class="input-name-wrapper">
-    <div class="first-name-input">
-      <input type="text" placeholder="Имя">
-    </div>
-    <div class="last-name-input">
-      <input type="text" placeholder="Фамилия">
-    </div>
-  </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { watch, onUnmounted, reactive, ref } from 'vue'
 import AvatarUploadSVG from '../../public/AvatarUploadSVG.vue'
 import UploadAvatarOnDrag from '../../public/UploadAvatarOnDrag.vue'
 import useNotify from '@/composable/useNotify'
@@ -128,44 +120,84 @@ function clampPosition() {
 let dragging = false
 const lastPointer = { x: 0, y: 0 }
 
-function onFileChange(e) {
-  const file = e.target.files?.[0] || e.dataTransfer?.files?.[0];
-  if (!file || !file.type.match('image.*')) {
-    notify.warning('Аватар', 'Пожалуйста выберите фотографию с нужным типом файла.')
-    return;
+async function onFileChange(e) {
+  try {
+    // 1. Получаем файл
+    const file = e.target.files?.[0] || e.dataTransfer?.files?.[0];
+    if (!file || !file.type.match('image.*')) {
+      notify.warning('Аватар', 'Пожалуйста выберите фотографию с нужным типом файла.')
+      return;
+    }
+
+    // 2. Сброс состояний
+    saveState.allowed = true
+    saveState.saved = false
+    regAuth.setOriginalImage(null)
+    imgLoaded = false
+
+    // 3. Сохраняем оригинал (blob)
+    regAuth.setOriginalImage(file)
+
+    // 4. Преобразуем файл в Data URL
+    const imageData = await blobToDataUrl(file)
+
+    // 5. Загружаем в canvas
+    await loadImageToCanvas(imageData)
+  } catch(error) {
+    notify.error('Аватар', error.message)
   }
-  saveState.allowed = true
-  saveState.saved = false
-  imgLoaded = false
-  const url = URL.createObjectURL(file)
-  img.onload = () => {
-    prepareCanvas()
-    URL.revokeObjectURL(url)
-    state.imgWidth = img.width
-    state.imgHeight = img.height
-
-    const canvas = canvasRef.value
-    const cw = canvas.width
-    const ch = canvas.height
-    const radius = cw / 2.5
-
-    const coverScale = Math.max((radius*2) / img.width, (radius*2) / img.height)
-    const fitScale  =Math.min((radius*2) / img.width, (radius*2) / img.height)
-
-    state.scale = coverScale
-    MIN_SCALE = fitScale
-    state.x = (cw - img.width * state.scale) / 2
-    state.y = (ch - img.height * state.scale) / 2
-
-    imgLoaded = true
-    draw()
-  }
-  img.onerror = () => {
-    notify.error('Аватар', 'Ошибка загрузки фотографии.')
-    URL.revokeObjectURL(url)
-  }
-  img.src = url
 }
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+    reader.readAsDataURL(blob);
+  });
+}
+async function loadImageToCanvas(imageData) {
+  return new Promise((resolve, reject) => {
+    img.src = imageData
+    img.onload = () => {
+      try {
+        // Настройки canvas
+        prepareCanvas()
+        const canvas = canvasRef.value;
+        const radius = canvas.width / 2.5;
+        
+        // Рассчет масштаба
+        const coverScale = Math.max(
+          (radius * 2) / img.width, 
+          (radius * 2) / img.height
+        );
+        
+        state.scale = coverScale;
+        MIN_SCALE = Math.min(
+          (radius * 2) / img.width,
+          (radius * 2) / img.height
+        );
+        
+        // Центрирование
+        state.x = (canvas.width - img.width * state.scale) / 2;
+        state.y = (canvas.height - img.height * state.scale) / 2;
+        
+        // Сохраняем размеры
+        state.imgWidth = img.width;
+        state.imgHeight = img.height;
+        
+        // Рисуем
+        imgLoaded = true;
+        draw();
+        resolve();
+      } catch(error) {
+        reject(new Error(`Ошибка инициализации: ${error.message}`))
+      }
+    }
+    img.onerror = () => reject(new Error('Невозможно загрузить изображение'))
+  })
+}
+
+
 
 function prepareCanvas() {
   const svg = document.querySelector('.label-photo')
@@ -264,6 +296,7 @@ function onPointerDown(e) {
 function onPointerMove(e) {
   if (!dragging) return;
   saveState.saved = false
+  regAuth.setAvatarImage(null)
 
   const dx = e.clientX - lastPointer.x;
   const dy = e.clientY - lastPointer.y;
@@ -289,6 +322,7 @@ function onPointerUp(e) {
 function onWheel(e) {
    if (!imgLoaded) return;
    saveState.saved = false
+   regAuth.setAvatarImage(null)
   e.preventDefault();
 
   const canvas = canvasRef.value;
@@ -312,6 +346,7 @@ function onWheel(e) {
 function zoomIn() {
   if (!imgLoaded) return;
   saveState.saved =false
+  regAuth.setAvatarImage(null)
   
   const canvas = canvasRef.value;
   const rect = canvas.getBoundingClientRect();
@@ -324,6 +359,7 @@ function zoomIn() {
 function zoomOut() {
   if (!imgLoaded) return;
   saveState.saved =false
+  regAuth.setAvatarImage(null)
 
   const canvas = canvasRef.value;
   const rect = canvas.getBoundingClientRect();
@@ -360,18 +396,72 @@ onUnmounted(()=> {
   window.removeEventListener('keydown', handleKeyDown)
 })
 
-function saveAvatar () {
-  saveState.proccessing = true
-  setTimeout(()=> {
-    saveState.saved = true
-    saveState.proccessing = false
-  }, 300)
+function saveAvatar() {
+  if (!imgLoaded) {
+    notify.warning("Аватар", "Сначала загрузите изображение!");
+    return;
+  }
+
+  saveState.proccessing = true;
+
+  const canvas = canvasRef.value;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const radius = canvas.width / 2.5; // Должно совпадать с радиусом из drawImageWithMask
+
+  // Создаем временный canvas
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = radius * 2;
+  tempCanvas.height = radius * 2;
+  const tempCtx = tempCanvas.getContext('2d');
+
+  // Вычисляем видимую область в исходных координатах изображения
+  const imgCenterX = (centerX - state.x) / state.scale;
+  const imgCenterY = (centerY - state.y) / state.scale;
+  const imgRadius = radius / state.scale;
+
+  // Вычисляем координаты левого верхнего угла области для вырезки
+  const sx = imgCenterX - imgRadius;
+  const sy = imgCenterY - imgRadius;
+  const sw = imgRadius * 2;
+  const sh = imgRadius * 2;
+
+  // Рисуем вырезанную область на временном canvas
+  tempCtx.beginPath();
+  tempCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+  tempCtx.clip();
+
+  tempCtx.drawImage(
+    img,
+    sx, sy, sw, sh,  // Какая область исходного изображения берется
+    0, 0,            // Куда помещаем на tempCanvas
+    radius * 2,      // Ширина на tempCanvas
+    radius * 2       // Высота на tempCanvas
+  );
+
+  // Сохраняем
+  tempCanvas.toBlob((blob) => {
+    if (!blob) {
+      notify.error("Ошибка", "Не удалось создать файл!");
+      saveState.proccessing = false;
+      return;
+    }
+
+    //Сохранем в pinia store вырезанное изображение
+    regAuth.setAvatarImage(blob)
+
+    saveState.saved = true;
+    saveState.proccessing = false;
+  }, 'image/png', 0.9);
 }
 
-
-onMounted(()=> {
-  notify.info('Аватар', 'Вы можете перетащить фотографию прямо в область для загрузки фотографии, вы увидите соотвествующие подсказки')
+watch(() => regAuth.currentStep,
+(newVal)=> {
+  if(newVal === 2) {
+    notify.info('Аватар', 'Вы можете перетащить фотографию прямо в область для загрузки фотографии, вы увидите соотвествующие подсказки')
+  }
 })
+
 </script>
 
 <style scoped>
@@ -382,7 +472,7 @@ onMounted(()=> {
     justify-content: center;
      width: 100%;
     height: 180px;
-    margin-top: 100px;
+    margin-top: 75px;
 }
 
 .label-photo {
@@ -406,6 +496,9 @@ onMounted(()=> {
   stroke: rgba(255,255,255, .7);
 }
 .save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: #0e1621;
   box-shadow: 3px 3px 6px black;
   padding: 5px;
@@ -418,7 +511,6 @@ onMounted(()=> {
   height: 40px;
 }
 .save-btn > svg {
-  transform: translateY(2px);
   fill: rgba(255,255,255,.5);
   transition: all .3s ease-in-out;
 }

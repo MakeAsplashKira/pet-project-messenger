@@ -2,15 +2,22 @@ import { defineStore } from "pinia";
 
 export const useRegAuth = defineStore('regAuth', {
     state: () => ({
-        currentStep: 1,
+        currentStep: 2,
         password: "",
         email: "",
         username: "",
+        firstName: "",
+        lastName: "",
         avatarImage: null,
+        originalImage: null,
     }),
     actions: {
         setAvatarImage(image) {
             this.avatarImage = image
+        },
+        setOriginalImage(image) {
+            this.originalImage = image
+            this.avatarImage = null
         },
         setPassword(password) {
             this.password = password
@@ -20,6 +27,12 @@ export const useRegAuth = defineStore('regAuth', {
         },
         setUsername(username) {
             this.username = username
+        },
+        setFirstName(firstName) {
+            this.firstName = firstName
+        },
+        setLastName(lastName) {
+            this.lastName = lastName
         }
     } 
 })
