@@ -10,6 +10,8 @@ export const useRegAuth = defineStore('regAuth', {
         lastName: "",
         avatarImage: null,
         originalImage: null,
+        country: "",
+        city: "",
     }),
     actions: {
         setAvatarImage(image) {
@@ -33,6 +35,12 @@ export const useRegAuth = defineStore('regAuth', {
         },
         setLastName(lastName) {
             this.lastName = lastName
+        },
+        setCountry(country) {
+            this.country = country
+        },
+        setCity(city) {
+            this.city = city
         }
     } 
 })

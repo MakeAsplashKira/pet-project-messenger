@@ -165,11 +165,27 @@
       <!-- Шаг 3 -->
       <div v-show="regAuth.currentStep === 3 && AuthType=='register'" class="auth-step">
         <div class="auth-content-header third-step-header">Почти готово!🔥</div>
-        <div class="input-container">
-          <input type="text" placeholder="Страна">
+        <div class="input-container mgt cc">
+          <div class="input-icon country-svg"><CountrySVG/></div>
+          <input v-model="country" readonly type="text" placeholder="Страна">
+          <div class="input-status">
+            <LoadingSVG v-if="country.length == 0" />
+            <AuthSuccessSVG v-if="country.length > 0"/>
+          </div>
         </div>
-        <div class="input-container">
-          <input type="text" placeholder="Город">
+        <div class="input-container cc">
+          <div class="input-icon city-svg"><CitySVG/></div>
+          <input v-model="city" readonly type="text" placeholder="Город">
+          <div class="input-status">
+            <LoadingSVG v-if="city.length == 0"/>
+            <AuthSuccessSVG v-if="city.length > 0"/>
+          </div>
+        </div>
+        <div class="gender-wrapper">
+          <div class="gender-btn"></div>
+          <div class="sex-glyph female">✝</div>
+          <div class="sex-glyph male">➜</div>
+          <div class="gender-ball"></div>
         </div>
       </div>
     </div>
@@ -197,6 +213,9 @@ import { useRegAuth } from '@/stores/regAuth';
 import LoadingSVG from '../../public/LoadingSVG.vue';
 import AuthSuccessSVG from '../../public/AuthSuccessSVG.vue';
 import AuthFailedSVG from '../../public/AuthFailedSVG.vue';
+import axios from 'axios';
+import CountrySVG from '../../public/CountrySVG.vue';
+import CitySVG from '../../public/CitySVG.vue';
 const {notify} = useNotify()
 const regAuth = useRegAuth()
 
@@ -249,13 +268,38 @@ watch(() => regAuth.currentStep,
 async (newStep) =>
  {
   await nextTick()
-
   const elements = document.querySelectorAll('.auth-step-anim')
   if(elements && newStep >=2) {
     elements[newStep - 2].classList.add('step-anim')
   }
+  if(newStep == 3) {
+    getUserLocationByIP()
+  }
 })
 
+const country = ref("")
+const city = ref("")
+
+
+async function getUserLocationByIP() {
+  axios.get('http://ip-api.com/json/?fields=status,message,country,city,isp')
+    .then(response => {
+      if(response.data.status === 'success') {
+        setTimeout(()=> {
+          regAuth.setCountry(response.data.country)
+          regAuth.setCity(response.data.city)
+          country.value = response.data.country
+          city.value = response.data.city
+          updateCurrentStepFillPercent(40)
+        },500)
+      } else {
+        notify.error('Автоопределние вашей геолокации',  response.data.message)
+      }
+    })
+    .catch(error => {
+      notify.error('Автоопределение вашей геолокации', error.message)
+    })
+}
 
 const AuthType = ref('choose')
 const isRotating = ref(false)
@@ -758,6 +802,14 @@ watchEffect(() => {
   secondStepReady.value = conditions.every(Boolean)
 })
 
+
+const gender = ref("")
+
+function changeGender() {
+  if(gender.value.length == '') updateCurrentStepFillPercent(20)
+  
+}
+
 const closeAuthModal = () => {
   auth.authModalOpen = false;
 }
@@ -1119,10 +1171,18 @@ onUnmounted(()=> {
   border: inset 2px #ffffff00;
 }
 
+
+
 .input-container:focus-within {
   margin-left: 0;
   margin-right: 0;
   border-radius: 0px;
+}
+
+.input-container.cc:focus-within {
+  margin-left: 15px;
+  margin-right: 15px;
+  border-radius: 8px;
 }
 
 .input-container:focus-within > .input-icon {
@@ -1145,6 +1205,10 @@ onUnmounted(()=> {
 
 .input-container:not(:first-child) {
   margin-top: 20px;
+}
+
+.input-container.mgt {
+  margin-top: 100px;
 }
 
 .input-container input:focus {
@@ -1577,5 +1641,69 @@ onUnmounted(()=> {
 }
 
 
+.city-svg > svg{
+  transform: translateY(2px);
+  fill: rgba(255, 255, 255, 1);
+}
+
+.country-svg > svg {
+  fill: white;
+  transform: scale(1.2);
+}
+
+.gender-wrapper {
+  position: relative;
+  width: 180px;
+  margin-top: 40px;
+  margin-left: 15px;
+  cursor: pointer;
+}
+
+.gender-btn {
+  position: relative;
+  background-color: #0e1621;
+  border-radius: 16px;
+  box-shadow: 3px 3px 6px black;
+  transition: all .3s ease-in-out;
+  height: 40px;
+  z-index: 2;
+  width: 100%;
+}
+
+.sex-glyph {
+  position: absolute;
+  user-select: none;
+  transition: all .3s ease-in-out;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.male {
+  top: -30px;
+  right: -22px;
+  font-size: 35px;
+  transform: rotate(-45deg);
+  
+}
+
+.female {
+  bottom: -45px;
+  left: 15px;
+  font-size: 50px;
+  transform: rotate(180deg);
+  z-index: 1;
+}
+.gender-ball {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  background-color: rgba(255,255,255, .2);
+  border: 2px solid rgba(255, 255, 255, .3);
+  border-radius: 50%;
+  z-index: 3;
+  transition: all .3s ease-in-out;
+}
 
 </style>
