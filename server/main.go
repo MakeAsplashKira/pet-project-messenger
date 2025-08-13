@@ -5,6 +5,7 @@ import (
 	"messenger/internal/config"
 	"messenger/internal/handlers"
 	"messenger/internal/handlers/music"
+	"messenger/internal/handlers/user"
 	"messenger/internal/middleware"
 	"os"
 
@@ -37,6 +38,7 @@ func main() {
 	auth := handlers.NewHandler(db, jwtSecret)
 	authEmail := handlers.NewEmailHandler(auth, smtpConfig)
 	musicHandler := music.NewMusicHandler(auth)
+	userHandler := user.NewUserHandler(auth)
 
 	// Инициализация Gin
 	router := gin.Default()
@@ -69,6 +71,7 @@ func main() {
 
 		api.POST("/upload-track", musicHandler.UploadTrackHandler)
 		api.GET("/stream-track/:id", musicHandler.StreamTrackHandler)
+		api.GET("/profile/:user_id/avatar", userHandler.ServeAvatar)
 	}
 
 	// Защищённые маршруты
@@ -76,6 +79,7 @@ func main() {
 	protected.Use(middleware.AuthMiddleware(jwtSecret))
 	{
 		protected.POST("/logout", auth.Logout)
+		protected.GET("/profile/:user_id", userHandler.GetUserProfileDataHandler)
 	}
 
 	// Запуск сервера

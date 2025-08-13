@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 
 export const useRegAuth = defineStore('regAuth', {
     state: () => ({
-        currentStep: 2,
+        currentStep: 1,
         password: "",
         email: "",
         username: "",

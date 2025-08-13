@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -35,22 +36,85 @@ type LoginRequest struct {
 }
 
 type User struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	ImageOriginal string `json:"image_original"`
+	ImageAvatar   string `json:"image_avatar"`
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Country       string `json:"country"`
+	City          string `json:"city"`
+	Gender        string `json:"gender"`
 }
 
 func (h *Handler) RegistrateNewUser(c *gin.Context) {
+	// 1. Парсим данные (не файлы)
 	var req User
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
+	req.Username = c.PostForm("username")
+	req.Email = c.PostForm("email")
+	req.Password = c.PostForm("password")
+	req.FirstName = c.PostForm("first_name")
+	req.LastName = c.PostForm("last_name")
+	req.Country = c.PostForm("country")
+	req.City = c.PostForm("city")
+	req.Gender = c.PostForm("gender")
+
+	if req.Username == "" || req.Email == "" || req.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Необходимо заполнить все обязательные поля"})
 		return
 	}
+
+	// 2. Получаем файлы формы
+	originalFile, originalHeader, err := c.Request.FormFile("image_original")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нету файла."})
+		return
+	}
+	defer originalFile.Close()
+
+	avatarFile, avatarHeader, err := c.Request.FormFile("image_avatar")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нету файла."})
+		return
+	}
+	defer avatarFile.Close()
+
+	// 3. Создаем папку для загрузке, если её нету.
+
+	uploadDir := "uploads/avatars/"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать директорию"})
+		return
+	}
+
+	// 4. Генерируем уникальный имена файлов
+	originalExt := filepath.Ext(originalHeader.Filename)
+	avatarExt := filepath.Ext(avatarHeader.Filename)
+
+	originalName := fmt.Sprintf("original_%d%s", time.Now().UnixNano(), originalExt)
+	avatarName := fmt.Sprintf("avatar_%d%s", time.Now().UnixNano(), avatarExt)
+
+	originalPath := filepath.Join(uploadDir, originalName)
+	avatarPath := filepath.Join(uploadDir, avatarName)
+
+	// 5. Сохраняем файлы
+	if err := c.SaveUploadedFile(originalHeader, originalPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения original файла"})
+		return
+	}
+	if err := c.SaveUploadedFile(avatarHeader, avatarPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения avatar файла"})
+		return
+	}
+
+	// 6. Валидация пароля
 	if len(req.Password) < 8 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль слишком короткий (минимум 8 символов)"})
 		return
 	}
+	// 7. Хеширование пароля
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при хешировании пароля"})
@@ -59,8 +123,11 @@ func (h *Handler) RegistrateNewUser(c *gin.Context) {
 
 	var userID string
 	err = h.DB.QueryRow(context.Background(),
-		"INSERT INTO users (username, email, password_hash, created_at) VALUES ($1, $2, $3, $4) RETURNING user_id",
-		req.Username, req.Email, string(hashedPassword), time.Now(),
+		`INSERT INTO users (username, email, password_hash,
+		image_original, image_avatar, first_name,
+		last_name, country, city, gender, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING user_id`,
+		req.Username, req.Email, string(hashedPassword), originalPath, avatarPath,
+		req.FirstName, req.LastName, req.Country, req.City, req.Gender, time.Now(),
 	).Scan(&userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user data"})
@@ -92,8 +159,9 @@ func (h *Handler) RegistrateNewUser(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"status":       "success",
+		"success":      true,
 		"access_token": tokens.AccessToken,
+		"user_id":      userID,
 	})
 }
 
@@ -147,6 +215,7 @@ func (h *Handler) Login(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"status":       "success",
 		"access_token": tokens.AccessToken,
+		"user_id":      user.ID,
 	})
 }
 

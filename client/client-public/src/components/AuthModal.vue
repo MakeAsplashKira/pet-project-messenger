@@ -158,7 +158,7 @@
          </div>
          <div class="second-step-controls">
             <div class="second-step-btn" :class="{'active':secondStepReady}">Завершить регистрацию</div>
-            <div @click="goToNextStep()" class="second-step-btn" :class="{'active':secondStepReady}">Следующий шаг</div>
+            <div @click="goToNextStep" class="second-step-btn" :class="{'active':secondStepReady}">Следующий шаг</div>
          </div>
       </div>
 
@@ -182,10 +182,43 @@
           </div>
         </div>
         <div class="gender-wrapper">
-          <div class="gender-btn"></div>
-          <div class="sex-glyph female">✝</div>
-          <div class="sex-glyph male">➜</div>
-          <div class="gender-ball"></div>
+          <div class="gender-select" @click="toggleDropdown()">
+            <div class="gender-btn" :class="{'fe':selectedGender == 'Женский', 'ma': selectedGender == 'Мужской'}">
+              <span style="user-select: none;">{{ selectedGender || 'Выберите пол' }}</span>
+            </div>
+            <div class="gender-dropdown" :class="{'show': isDropdownOpen}">
+              <div class="dropdown-item m" @click="selectGender('Мужской')">
+                <span class="male-icon">♂</span> Мужской
+              </div>
+              <div class="dropdown-item f" @click="selectGender('Женский')">
+                <span class="female-icon">♀</span> Женский
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="agreements">
+          <label class="checkbox-wrapper">
+            <input 
+              type="checkbox" 
+              v-model="acceptTerms"
+              class="hidden-checkbox"
+            >
+            <span class="custom-checkbox"></span>
+            <span>Я принимаю</span><a href="/terms" target="_blank">Условия использования</a>
+          </label>
+
+          <label class="checkbox-wrapper">
+            <input 
+              type="checkbox" 
+              v-model="acceptPrivacy"
+              class="hidden-checkbox"
+            >
+            <span class="custom-checkbox"></span>
+            <span>Я согласен с</span><a href="/privacy" target="_blank">Политикой конфиденциальности</a>
+          </label>
+        </div>
+        <div class="third-step-controls">
+          <div @click="completeRegistration()" class="third-step-btn" :class="{'active':thirdStepReady}">Завершить регистрацию</div>
         </div>
       </div>
     </div>
@@ -216,6 +249,7 @@ import AuthFailedSVG from '../../public/AuthFailedSVG.vue';
 import axios from 'axios';
 import CountrySVG from '../../public/CountrySVG.vue';
 import CitySVG from '../../public/CitySVG.vue';
+import router from '@/router';
 const {notify} = useNotify()
 const regAuth = useRegAuth()
 
@@ -322,7 +356,7 @@ const ChangeAuthType = (type) => {
 
 const goToNextStep=()=> {
   if(regAuth.currentStep == 1) {
-    if(firstStepReady) {
+    if(firstStepReady.value) {
       // 1. Заполняем полностью круг из LiquidProgress.vue
         updateCurrentStepFillPercentToMax()
 
@@ -341,7 +375,7 @@ const goToNextStep=()=> {
         regAuth.setUsername(username.value)
       }
   }
-  if (regAuth.currentStep == 2 && secondStepReady) {
+  if (regAuth.currentStep == 2 && secondStepReady.value) {
       // 1. Заполняем полностью круг из LiquidProgress.vue
       updateCurrentStepFillPercentToMax()
       
@@ -356,9 +390,6 @@ const goToNextStep=()=> {
       // 4. Заносим данные в pinia store
       regAuth.setFirstName(firstName.value)
       regAuth.setLastName(lastName.value)
-  }
-  if(regAuth.currentStep == 3) {
-    console.log('Переходим на следущий шаг')
   }
 }
 
@@ -688,16 +719,15 @@ const validateEmail = async  () => {
 }
 
 const completeRegistration = async () => {
-  if (!firstStepReady.value) return
+  //if (!firstStepReady.value) return
+  const authStore = useAuthStore()
   
   if (regAuth.currentStep == 1) {
     try {
-      const authStore = useAuthStore()
-
       const data = await authStore.register({
-        username: username.value,
-        email: email.value,
-        password: password.value
+        username: regAuth.username,
+        email: regAuth.email,
+        password: regAuth.password
       })
       if (data?.success) {
         notify.success('Авторизация', 'Вы успешно зарегестрировались!')
@@ -708,9 +738,36 @@ const completeRegistration = async () => {
     }
     catch(error) {
       notify.error('Неизвестная ошибка при регистрации')
-      console.error('Registration error:', error? 'Some error':'Some error')
     }
-  } 
+  }
+  if(regAuth.currentStep == 2) {
+    //
+  }
+  if(regAuth.currentStep == 3) {
+    try {
+      const data = await authStore.register({
+      username: regAuth.username,
+      email:regAuth.email,
+      password: regAuth.password,
+      image_original: regAuth.originalImage,
+      image_avatar: regAuth.avatarImage,
+      first_name: regAuth.firstName,
+      last_name: regAuth.lastName,
+      country: regAuth.country,
+      city: regAuth.city,
+      gender: selectedGender.value == 'Мужской'? 'male':'female',
+    })
+    if(data?.success) {
+      notify.success('Авторизация', 'Вы успешно зарегестрировались!')
+      closeAuthModal()
+      router.push("/profile")
+    } else {
+      notify.error('Авторизация', data.error || "Ошибка регистрации")
+    }
+    } catch(error) {
+      notify.error('Авторизация','Неизвестная ошибка регистрации')
+    }
+  }
 };
 
 let avatarChanged = false
@@ -803,12 +860,33 @@ watchEffect(() => {
 })
 
 
-const gender = ref("")
+const selectedGender = ref("")
+const isDropdownOpen = ref(false)
 
-function changeGender() {
-  if(gender.value.length == '') updateCurrentStepFillPercent(20)
-  
+const toggleDropdown = () => {
+  isDropdownOpen.value = !isDropdownOpen.value
 }
+
+function selectGender(gender) {
+  if(selectedGender.value.length == '') updateCurrentStepFillPercent(20)
+  selectedGender.value = gender
+  isDropdownOpen.value = false
+  toggleDropdown()
+}
+
+const acceptTerms = ref(false)
+const acceptPrivacy = ref(false)
+const thirdStepReady = ref(false)
+
+watchEffect(()=> {
+  const conditions = [
+    acceptPrivacy.value,
+    acceptTerms.value,
+    city.value,
+    country.value  
+  ]
+  thirdStepReady.value = conditions.every(Boolean)
+})
 
 const closeAuthModal = () => {
   auth.authModalOpen = false;
@@ -821,9 +899,6 @@ onUnmounted(()=> {
 
 </script>
 <style scoped>
-
-
-
 
 .content-choose-buttons {
   position: absolute;
@@ -1654,56 +1729,181 @@ onUnmounted(()=> {
 .gender-wrapper {
   position: relative;
   width: 180px;
-  margin-top: 40px;
+  margin-top: 20px;
   margin-left: 15px;
+}
+.gender-select {
+  position: relative;
   cursor: pointer;
 }
 
 .gender-btn {
-  position: relative;
-  background-color: #0e1621;
-  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 15px;
   box-shadow: 3px 3px 6px black;
+  background-color: #0e1621;
+  border-radius: 8px;
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
+}
+
+.gender-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: #0e1621;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 3px 3px 6px black;
+  z-index: 3;
+  margin-top: -1px;
+  overflow: hidden;
+  transform-origin: top;
+  transform: scaleY(0);
+  transition: .3s ease-in-out;
+}
+
+.gender-dropdown.show {
+  transform: scaleY(1);
+}
+
+.dropdown-item {
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.3s;
+  gap: 24px;
+  user-select: none;
+}
+
+.dropdown-item:hover {
   transition: all .3s ease-in-out;
-  height: 40px;
-  z-index: 2;
+}
+.dropdown-item:hover.m {
+  background-color: #0066ff1e;
+}
+.dropdown-item:hover.f {
+  background-color: #ff00ff18;
+}
+
+
+.male-icon, .female-icon {
+  font-size: 20px;
+  transition: all .5s ease-in-out;
+  text-align: center;
+}
+
+.male-icon {
+  color: #4a90e2;
+  transform: rotate(-45deg);
+  display: inline-block;
+}
+
+.female-icon {
+  color: #ff6b9e;
+  transform: rotate(180deg);
+  display: inline-block;
+}
+
+.dropdown-item:hover > .male-icon {
+  transform: rotate(30deg) scale(1.2);
+}
+
+.dropdown-item:hover > .female-icon {
+  transform: rotate(360deg) scale(1.2);
+}
+
+.gender-btn.fe {
+  transition: all .3s ease-in-out;
+  background-color: #ff02c8;
+}
+.gender-btn.ma {
+  transition: all .3s ease-in-out;
+  background-color: #0066ff;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  cursor: pointer;
+  margin-left: 15px;
+  margin-top: 20px;
+}
+
+.checkbox-wrapper:first-child {
+  margin-top: 40px;
+}
+
+.hidden-checkbox {
+  position: absolute;
+  opacity: 0;
+}
+
+.checkbox-wrapper > a {
+  font-size: 14px;
+  margin-left: 5px;
+}
+
+.checkbox-wrapper > span {
+  font-size: 14px;
+}
+
+.custom-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #00ff2a;
+  border-radius: 4px;
+  margin-right: 10px;
+  position: relative;
+  transition: all 0.3s;
+  text-wrap: nowrap;
+}
+
+.hidden-checkbox:checked + .custom-checkbox {
+  background-color: #00ff2a;
+}
+
+.hidden-checkbox:checked + .custom-checkbox::after {
+  content: "✓";
+  position: absolute;
+  color: #0e1621;
+  font-weight: bold;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.third-step-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 40px;
   width: 100%;
 }
 
-.sex-glyph {
-  position: absolute;
+.third-step-btn {
+  box-shadow: 3px 3px 6px black;
+  padding: 10px 15px;
+  cursor: not-allowed;
   user-select: none;
-  transition: all .3s ease-in-out;
+  background-color: #0e1621;
   color: rgba(255, 255, 255, 0.5);
-}
-
-.male {
-  top: -30px;
-  right: -22px;
-  font-size: 35px;
-  transform: rotate(-45deg);
-  
-}
-
-.female {
-  bottom: -45px;
-  left: 15px;
-  font-size: 50px;
-  transform: rotate(180deg);
-  z-index: 1;
-}
-.gender-ball {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 40px;
-  height: 40px;
-  background-color: rgba(255,255,255, .2);
-  border: 2px solid rgba(255, 255, 255, .3);
-  border-radius: 50%;
-  z-index: 3;
   transition: all .3s ease-in-out;
+  border-radius: 8px;
+}
+
+.third-step-btn.active {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.third-step-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow: 3px 5px 6px black;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 </style>

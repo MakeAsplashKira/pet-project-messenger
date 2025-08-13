@@ -8,9 +8,8 @@ export const useAuthStore = defineStore('auth', () => {
   const {notify} = useNotify()
   // State
   const accessToken = ref(null);
-  const user = ref(null);
+  const userID = ref(null);
   const authModalOpen = ref(false);
-  const authStep = ref(1); // Для многошаговой формы
   
   // Getters
   const isAuthenticated = computed(() => !!accessToken.value);
@@ -25,7 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
  const clearAuth = () => {
   try {
     accessToken.value = null;
-    user.value = null;
+    userID.value = null;
     localStorage.removeItem('accessToken');
     if (api?.defaults?.headers?.common?.Authorization) {
       delete api.defaults.headers.common['Authorization'];
@@ -35,29 +34,22 @@ export const useAuthStore = defineStore('auth', () => {
   }
 };
   
-  const openAuthModal = (step = 1) => {
+  const openAuthModal = () => {
     authModalOpen.value = true;
-    authStep.value = step;
   };
   
   const closeAuthModal = () => {
     authModalOpen.value = false;
   };
-  
-  const nextStep = () => {
-    authStep.value++;
-  };
-  
-  const prevStep = () => {
-    authStep.value--;
-  };
+
   
 const register = async (userData) => {
   try {
     const {data} = await registerUser(userData);
     
-    if (data?.status === 'success') {
+    if (data?.success) {
         setAuth(data.access_token)
+        userID.value = data.user_id
         return {success: true}
     }
     return {success: false, error: data?.error}
@@ -67,13 +59,13 @@ const register = async (userData) => {
         success: false,
         error: error.response?.data?.error || error.message
     }
-    }
+  }
 };
   const login = async (userData) => {
     try {
       const { data } = await loginUser(userData);
       setAuth(data.access_token);
-      user.value = data.user;
+      userID.value = data.user_id;
       closeAuthModal();
       notify.success('Авторизация', 'Вы успешно вошли в аккаунт')
       return { success: true };
@@ -125,17 +117,14 @@ const register = async (userData) => {
 
   return {
     accessToken,
-    user,
+    userID,
     authModalOpen,
-    authStep,
     isAuthenticated,
     refreshTokens,
     clearAuth,
     checkAuth,
     openAuthModal,
     closeAuthModal,
-    nextStep,
-    prevStep,
     register,
     login,
     logout,
@@ -143,7 +132,7 @@ const register = async (userData) => {
 }, {
     persist: {
         key: 'auth-store',
-        paths: ['accessToken', 'user'],
+        paths: ['accessToken', 'userID'],
         storage: localStorage,
         beforeHydrate: (context) => {
             //логика

@@ -20,7 +20,23 @@ export const checkEmailOnServer = (email) => {
 }
 
 export const registerUser = (userData) => {
-  return api.post('/api/reg-user', userData);
+  const formData = new FormData()
+  formData.append("username", userData.username)
+  formData.append("email", userData.email)
+  formData.append("password", userData.password)
+  formData.append("image_original", userData.image_original)
+  formData.append("image_avatar", userData.image_avatar)
+  formData.append("first_name", userData.first_name)
+  formData.append("last_name", userData.last_name)
+  formData.append("country", userData.country)
+  formData.append("city", userData.city)
+  formData.append("gender", userData.gender)
+
+  return api.post('/api/reg-user', formData, {
+    headers: {
+      'Content-Type' : 'multipart/form-data'
+    }
+  });
 };
 
 export const sendVerificationCodeOnServer = (email) => {

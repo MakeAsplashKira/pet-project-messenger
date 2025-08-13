@@ -447,8 +447,10 @@ function saveAvatar() {
       return;
     }
 
+    const file = new File([blob], "image_avatar.png", {type: "image/png"})
+
     //Сохранем в pinia store вырезанное изображение
-    regAuth.setAvatarImage(blob)
+    regAuth.setAvatarImage(file)
 
     saveState.saved = true;
     saveState.proccessing = false;
