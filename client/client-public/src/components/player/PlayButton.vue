@@ -97,8 +97,8 @@ watch(
   justify-content: center;
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.7);
-  width: 40px;
-  height: 40px;
+  width: 35px;
+  height: 35px;
   text-align: center;
   color: black;
   z-index: 5;
@@ -109,9 +109,11 @@ watch(
   position: absolute;
   top: 50%;
   left: 50%;
+  transform: translate(-42%, -50%);
+}
+.play-btn:hover > svg {
   transform: translate(-45%, -50%);
 }
-
 .play-btn:hover {
   transform: translate(-50%, -50%) scale(1.05);
   background-color: rgba(255, 255, 255, 1);

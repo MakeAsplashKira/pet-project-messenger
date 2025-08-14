@@ -4,6 +4,8 @@
         <NextTrackSVG class="fliped-svg"/>
         <PlayButton/>
         <NextTrackSVG class="player-svg"/>
+        <MixButtonSVG class="mix-btn"/>
+        <LoopButtonSVG class="loop-btn"/>
     </div>
     <div class="player-content">
         <div class="player-main">
@@ -22,10 +24,15 @@
         </div>
         <TrackProgressBar/>
     </div>
+    <div class="player-volume-wrapper">
+        <div class="player-volume-btn"></div>
+    </div>
 </div>
 </template>
 
 <script setup>
+import LoopButtonSVG from '../../../public/LoopButtonSVG.vue';
+import MixButtonSVG from '../../../public/music/MixButtonSVG.vue';
 import NextTrackSVG from '../../../public/NextTrackSVG.vue';
 import PlayButton from './PlayButton.vue';
 import TrackProgressBar from './TrackProgressBar.vue';
@@ -55,7 +62,6 @@ const trackData =
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 15px;
 }
 
@@ -90,23 +96,25 @@ const trackData =
 
 .track-name {
     opacity: .9;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .track-artists > span{
-    font-size: 14px;
+    font-size: 12px;
     opacity: .6;
 }
 
 .track-image {
-    width: 40px;
-    height: 40px;
-    box-shadow: 3px 3px 6px black;
+    width: 35px;
+    height: 35px;
+    box-shadow: 1px 2px 4px black;
+    overflow: hidden;
+    border-radius: 4px;
 }
 
 .track-image img{
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
 }
 
 .player-controlls {
@@ -120,6 +128,42 @@ const trackData =
 }
 .fliped-svg:hover {
     transform: rotate(180deg) scale(1.05) translateY(-1px);
+}
+.mix-btn {
+    fill: rgba(255,255,255,.5);
+    cursor: pointer;
+    transition: all .3s ease-in-out;
+    margin-left: 10px;
+}
+.mix-btn:hover {
+    fill: rgba(255,255,255,.8);
+    transform: scale(1.1);
+}
+
+.loop-btn {
+    margin-left: 5px;
+    fill: rgba(255,255,255,.5);
+    cursor: pointer;
+    transition: all .3s ease-in-out;
+}
+
+.loop-btn:hover {
+    fill: rgba(255,255,255,.8);
+    transform: scale(1.1);
+}
+
+.player-volume-wrapper {
+    width: 100px;
+}
+
+.player-volume-svg {
+
+}
+
+.player-volume-btn {
+    height: 4px;
+    border-radius: 10px;
+    background-color: rgba(255,255,255,.3);
 }
 
 </style>

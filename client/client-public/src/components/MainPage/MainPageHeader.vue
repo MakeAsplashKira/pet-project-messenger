@@ -5,9 +5,9 @@
             <div ref="lottieContainer" class="logo-animation"></div> 
             <div class="site-name">MediaVerse</div>
         </div>
-        <MiniPlayer/>
-        <!-- <div @click="logout" class="vihjod" style="cursor: pointer;">Выход</div> -->
+        <MiniPlayer v-if="$route && !$route.path.includes('/music')"/>
         <div class="header-profile" @click="toggleProfileModal()">
+          <img :src="avatarUrl" alt="">
         </div>
         <div class="header-profile-modal" ref="headerModal">
           <div class="modal-btn settings">
@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import lottie from 'lottie-web';
 import { useAuthStore } from '@/stores/auth';
 import MiniPlayer from '../player/MiniPlayer.vue';
@@ -37,7 +37,9 @@ const headerModalOn = ref(false)
 
 const auth = useAuthStore()
 
-
+const avatarUrl = computed(()=> {
+    return `http://localhost:8080/api/profile/${auth.userID}/avatar`
+})
 
 function toggleProfileModal() {
   if(headerModal.value) {
@@ -142,9 +144,13 @@ const logout = async() => {
   height: 45px;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 1px 2px 5px black;
+  box-shadow: 2px 3px 6px black;
   background-color: #0e1621;
   z-index: 10;
+}
+.header-profile > img {
+  width: 45px;
+  height: 45px;
 }
 
 .header-profile::after {
